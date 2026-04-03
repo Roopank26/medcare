@@ -2,7 +2,7 @@
  * Medcare — Application Entry Point
  *
  * Responsibilities:
- * 1. Initialize monitoring (Sentry / console fallback) before React mounts
+ * 1. Initialize monitoring (console fallback) before React mounts
  * 2. Mount the React application
  * 3. Flush analytics on page unload
  */

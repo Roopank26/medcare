@@ -4,7 +4,7 @@
  * - React.lazy route-level code splitting
  * - react-hot-toast global notification container
  * - react-helmet-async for SEO meta management
- * - AppErrorBoundary with Sentry reporting
+ * - AppErrorBoundary for error recovery
  * - Network status banner (offline detection)
  * - Analytics page-view tracking
  */

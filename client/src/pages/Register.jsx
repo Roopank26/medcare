@@ -7,7 +7,6 @@ import {
   validateName,
   validatePassword,
   validatePasswordMatch,
-  runValidations,
 } from "../utils/validation";
 import { sanitizeEmail, sanitizeName } from "../utils/sanitize";
 import useToast from "../hooks/useToast";

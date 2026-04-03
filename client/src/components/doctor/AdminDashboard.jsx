@@ -14,11 +14,9 @@ import { getChatFeedback }       from '../../firebase/firestore';
 import { useAuth }               from '../../context/AuthContext';
 import { mlMetrics, mlHealth }   from '../../services/mlApi';
 import { subscribeToPatients }   from '../../firebase/firestore';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 import useToast                  from '../../hooks/useToast';
 import logger                    from '../../utils/logger';
-
-const COLORS = ['#2E86DE', '#58D68D', '#F39C12', '#E74C3C', '#9B59B6', '#1ABC9C', '#E67E22'];
 
 const StatCard = ({ label, value, sub, color = 'bg-blue-50 text-blue-700' }) => (
   <div className='card flex flex-col gap-1'>

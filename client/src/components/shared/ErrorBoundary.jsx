@@ -2,7 +2,7 @@
  * Medcare — Global Error Boundary (Enterprise)
  *
  * - Catches unhandled React render errors
- * - Reports to Sentry (when configured) or console
+ * - Reports to console (monitoring fallback)
  * - User-friendly recovery UI with error ID for support
  */
 
@@ -74,16 +74,11 @@ const AppErrorBoundary = ({ children }) => {
       FallbackComponent={(props) => (
         <FallbackUI {...props} errorId={generateErrorId()} />
       )}
-      onError={(error, info) => {
+      onError={(error) => {
         // Log the error
-        logger.error('[ErrorBoundary] Unhandled render error', error, {
-          componentStack: info?.componentStack?.split('\n').slice(0, 5).join(' '),
-        });
-        // Send to Sentry / monitoring
-        reportError(error, {
-          source:          'ErrorBoundary',
-          componentStack:  info?.componentStack,
-        });
+        logger.error('[ErrorBoundary] Unhandled render error', error);
+        // Report to monitoring (console fallback)
+        reportError(error);
       }}
       onReset={() => {
         // Don't hard-reload on retry — just re-render

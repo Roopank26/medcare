@@ -1,9 +1,8 @@
 /**
- * Medcare - Express Backend API Client (Phase 1+5)
+ * Medcare - Express Backend API Client
  *
- * Phase 1 addition: Firebase ID token is automatically attached as
- * Authorization: Bearer <token> on every request via request interceptor.
- * Phase 5 addition: Sentry breadcrumb on every API call for traceability.
+ * - Firebase ID token is automatically attached as
+ *   Authorization: Bearer <token> on every request via request interceptor.
  */
 
 import axios from 'axios';

@@ -39,7 +39,7 @@ const PatientManagement = () => {
       setLoading(false);
     });
     return () => unsub();
-  }, [user?.uid]);
+  }, [user?.uid, toast]);
 
   const handleChange = useCallback((e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));

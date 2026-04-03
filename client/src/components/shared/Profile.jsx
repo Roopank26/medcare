@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { updateUserProfile } from "../../firebase/firestore";
 import { MedicalDisclaimer, Spinner } from "./UI";
 import { validateName } from "../../utils/validation";
-import { sanitizeName, sanitizeText, sanitizeEmail } from "../../utils/sanitize";
+import { sanitizeName, sanitizeText } from "../../utils/sanitize";
 import useToast from "../../hooks/useToast";
 
 const CONDITIONS  = ["None","Hypertension","Diabetes","Asthma","Heart Disease","Arthritis","Thyroid Disorder","Anxiety/Depression","Other"];

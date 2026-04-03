@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { subscribeToSymptoms, getReportsDoc } from "../../firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 import { PageSpinner } from "../shared/UI";
-import useToast from "../../hooks/useToast";
 
 /**
  * Alerts — generated dynamically from real Firestore data.
@@ -152,7 +151,6 @@ const AlertCard = ({ alert, onDismiss }) => {
 
 const Alerts = () => {
   const { user }   = useAuth();
-  const toast = useToast();
   const [allAlerts,  setAllAlerts]  = useState([]);
   const [dismissed,  setDismissed]  = useState([]);
   const [loading,    setLoading]    = useState(true);

@@ -15,7 +15,7 @@ import {
 import { getSymptomsDoc, getReportsDoc } from "../../firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
 import { StatCardSkeleton, MedicalDisclaimer } from "../shared/UI";
-import analytics, { EVENTS } from "../../utils/analytics";
+import analytics from "../../utils/analytics";
 import logger from "../../utils/logger";
 import useToast from "../../hooks/useToast";
 

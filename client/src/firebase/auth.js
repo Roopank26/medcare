@@ -183,7 +183,7 @@ export const loginWithEmail = async ({ email, password }) => {
     
     // ✅ Step 3: Try backend sync as fallback (NON-PRIMARY)
     console.log('[Auth] Trying backend profile fetch as fallback...');
-    const { profile: backendProfile, error: backendError } = await syncLoginWithBackend(user);
+    const { profile: backendProfile } = await syncLoginWithBackend(user);
     
     if (backendProfile) {
       console.log('[Auth] ✅ Profile found via backend fallback', {
