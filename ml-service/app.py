@@ -109,14 +109,14 @@ model_ready = predictor.load()
 if not model_ready:
     logger.error("MODEL_LOADING_FAILED", extra={
         "status": "CRITICAL",
-        "message": "ML model failed to load - service degraded"
+        "detail": "ML model failed to load - service degraded"
     })
     print("[WARN] ML Model Not Available!")
     print("[WARN] Service running but /predict will return 503 error")
     print("[WARN] To fix: run 'python train_model.py' in ml-service directory")
 else:
     print("[PASS] ML Model Ready - Service Fully Operational")
-    logger.info("MODEL_LOADED", extra={"status": "OK"})
+    logger.info("MODEL_LOADED", extra={"status": "OK", "detail": "ML model initialized successfully"})
 
 # ── Helpers ───────────────────────────────────────────────────
 def ok(data, status=200):
@@ -224,9 +224,10 @@ def predict():
         )
         logger.warning("low_confidence_prediction", extra={
             "request_id": g.request_id,
+            "detail": f"Low confidence ({result['confidence']}%) for {result['disease']}",
             "disease":    result["disease"],
             "confidence": result["confidence"],
-            "symptoms":   symptoms[:200],
+            "symptom_count": len(symptoms.split()) if symptoms else 0,
         })
     else:
         result["low_confidence_fallback"] = False
@@ -328,7 +329,7 @@ def rate_limited(e):
 
 @app.errorhandler(500)
 def server_error(e):
-    logger.error("unhandled_exception", extra={"error": str(e)})
+    logger.error("unhandled_exception", extra={"detail": str(e), "error_type": type(e).__name__})
     return err("Internal server error", 500)
 
 

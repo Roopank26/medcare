@@ -229,7 +229,7 @@ DISEASE_META = {
             "Avoid tea and coffee with meals (inhibit iron absorption)",
             "Rest more than usual - your body needs it",
         ],
-        "emoji": "🩺",
+        "emoji": "[ANEMIA]",
     },
 }
 
@@ -341,7 +341,7 @@ class MedcarePredictor:
         missing_files = {}
         for name, path in required_files.items():
             exists = os.path.exists(path)
-            status = "✅" if exists else "❌"
+            status = "[OK]" if exists else "[MISSING]"
             print(f"[CHECK] {status} {name}: {path}")
             if not exists:
                 missing_files[name] = path
@@ -361,23 +361,23 @@ class MedcarePredictor:
             # Load model
             print(f"[LOAD] Loading model...")
             self.model = joblib.load(MODEL_PATH)
-            print(f"[LOAD] ✅ Model loaded: {type(self.model).__name__}")
+            print(f"[LOAD] [OK] Model loaded: {type(self.model).__name__}")
             
             # Load encoder
             print(f"[LOAD] Loading encoder...")
             self.encoder = joblib.load(ENCODER_PATH)
             n_diseases = len(self.encoder.classes_)
-            print(f"[LOAD] ✅ Encoder loaded: {n_diseases} disease classes")
+            print(f"[LOAD] [OK] Encoder loaded: {n_diseases} disease classes")
             
             # Load symptoms
             print(f"[LOAD] Loading symptoms...")
             with open(SYMPTOMS_PATH) as f:
                 self.symptoms = json.load(f)
             n_symptoms = len(self.symptoms)
-            print(f"[LOAD] ✅ Symptoms loaded: {n_symptoms} features")
+            print(f"[LOAD] [OK] Symptoms loaded: {n_symptoms} features")
             
             self._loaded = True
-            print(f"[✅] ML MODEL READY")
+            print(f"[PASS] ML MODEL READY")
             return True
             
         except json.JSONDecodeError as e:
