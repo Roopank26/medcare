@@ -11,27 +11,36 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY . .
 
 # Train model while ROOT - MUST succeed or build fails
-RUN echo "[BUILD] Training ML model..." && \
+RUN echo "[BUILD] STARTING ML MODEL TRAINING..." && \
     python train_model.py || { \
         echo "[ERROR] Model training FAILED!"; \
         echo "[ERROR] Check logs above for details"; \
+        echo "[ERROR] Build cannot continue"; \
         exit 1; \
     }
 
-# Verify model files exist BEFORE switching user
-RUN [ -f "models/medcare_model.pkl" ] || { \
-        echo "[ERROR] Model file not found: models/medcare_model.pkl"; \
+# Verify ALL model files exist BEFORE switching user
+RUN echo "[BUILD] Verifying model files..." && \
+    [ -f "models/medcare_model.pkl" ] || { \
+        echo "[ERROR] MISSING: models/medcare_model.pkl"; \
+        ls -la models/ || echo "models directory not found or empty"; \
         exit 1; \
     } && \
     [ -f "models/label_encoder.pkl" ] || { \
-        echo "[ERROR] Encoder file not found: models/label_encoder.pkl"; \
+        echo "[ERROR] MISSING: models/label_encoder.pkl"; \
         exit 1; \
     } && \
     [ -f "models/symptoms_list.json" ] || { \
-        echo "[ERROR] Symptoms file not found: models/symptoms_list.json"; \
+        echo "[ERROR] MISSING: models/symptoms_list.json"; \
         exit 1; \
     } && \
-    echo "[BUILD] [PASS] All model files verified"
+    [ -f "models/model_meta.json" ] || { \
+        echo "[ERROR] MISSING: models/model_meta.json"; \
+        exit 1; \
+    } && \
+    echo "[BUILD] SUCCESS: All 4 model files verified and present" && \
+    ls -lah models/ && \
+    echo "[BUILD] Model directory ready for production"
 
 # Create non-root user and set permissions
 RUN groupadd -r mluser && useradd -r -g mluser mluser && \

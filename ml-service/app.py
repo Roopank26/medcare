@@ -103,20 +103,38 @@ _stats = {
 
 # ── Load ML model ─────────────────────────────────────────────
 print("\n[STARTUP] Initializing ML model...")
-predictor   = MedcarePredictor.get()
-model_ready = predictor.load()
-
-if not model_ready:
-    logger.error("MODEL_LOADING_FAILED", extra={
+print(f"[DEBUG] Attempting to load model from predictor...")
+try:
+    predictor = MedcarePredictor.get()
+    model_ready = predictor.load()
+    
+    if not model_ready:
+        print("[WARN] ML Model Not Available!")
+        print("[WARN] Service running but /predict will return 503 error")
+        print("[WARN] To fix: ensure Dockerfile runs 'python train_model.py' successfully")
+        logger.error("MODEL_LOADING_FAILED", extra={
+            "status": "CRITICAL",
+            "detail": "ML model failed to load during startup - service degraded"
+        })
+    else:
+        print("[PASS] ML Model Ready - Service Fully Operational")
+        logger.info("MODEL_LOADED", extra={
+            "status": "OK", 
+            "detail": "ML model initialized successfully",
+            "model_type": type(predictor.model).__name__,
+            "diseases": len(predictor.encoder.classes_) if predictor.encoder else 0,
+            "symptoms": len(predictor.symptoms) if predictor.symptoms else 0,
+        })
+except Exception as e:
+    print(f"[ERROR] Exception during model loading: {type(e).__name__}: {e}")
+    import traceback
+    traceback.print_exc()
+    model_ready = False
+    logger.error("MODEL_LOADING_EXCEPTION", extra={
         "status": "CRITICAL",
-        "detail": "ML model failed to load - service degraded"
+        "detail": f"Exception: {str(e)}",
+        "error_type": type(e).__name__
     })
-    print("[WARN] ML Model Not Available!")
-    print("[WARN] Service running but /predict will return 503 error")
-    print("[WARN] To fix: run 'python train_model.py' in ml-service directory")
-else:
-    print("[PASS] ML Model Ready - Service Fully Operational")
-    logger.info("MODEL_LOADED", extra={"status": "OK", "detail": "ML model initialized successfully"})
 
 # ── Helpers ───────────────────────────────────────────────────
 def ok(data, status=200):

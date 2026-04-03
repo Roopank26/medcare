@@ -35,10 +35,14 @@ except ImportError as e:
 # ============================================================================
 
 print("\n[SETUP] Configuring paths...")
+print(f"[DEBUG] Current working directory: {os.getcwd()}")
+print(f"[DEBUG] __file__ value: {__file__}")
 
 # Get absolute path to this script's directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-print(f"[PATH] BASE_DIR: {BASE_DIR}")
+print(f"[PATH] BASE_DIR (absolute): {BASE_DIR}")
+print(f"[PATH] BASE_DIR exists: {os.path.isdir(BASE_DIR)}")
+print(f"[PATH] BASE_DIR is absolute: {os.path.isabs(BASE_DIR)}")
 
 # Data path
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -70,17 +74,22 @@ print("\n[SETUP] Creating directories...")
 try:
     os.makedirs(MODELS_DIR, exist_ok=True)
     if not os.path.isdir(MODELS_DIR):
-        raise OSError(f"Models directory could not be created: {MODELS_DIR}")
-    print(f"[OK] Models directory ready: {MODELS_DIR}")
+        raise OSError(f"Models directory not created or not a directory: {MODELS_DIR}")
+    # Verify we can write to it
+    test_file = os.path.join(MODELS_DIR, ".test_write")
+    with open(test_file, "w") as f:
+        f.write("x")
+    os.remove(test_file)
+    print(f"[OK] Models directory ready and writable: {MODELS_DIR}")
 except Exception as e:
-    print(f"[FATAL] Cannot create models directory: {e}")
+    print(f"[FATAL] Cannot create/write to models directory: {e}")
     sys.exit(1)
 
 # Create data directory
 try:
     os.makedirs(DATA_DIR, exist_ok=True)
     if not os.path.isdir(DATA_DIR):
-        raise OSError(f"Data directory could not be created: {DATA_DIR}")
+        raise OSError(f"Data directory not created or not a directory: {DATA_DIR}")
     print(f"[OK] Data directory ready: {DATA_DIR}")
 except Exception as e:
     print(f"[FATAL] Cannot create data directory: {e}")
@@ -98,6 +107,8 @@ def load_or_generate_data():
     # Check if CSV exists
     if os.path.exists(DATA_PATH):
         print(f"[LOAD] Found existing dataset: {DATA_PATH}")
+        print(f"[CHECK] File exists: {os.path.isfile(DATA_PATH)}")
+        print(f"[CHECK] File size: {os.path.getsize(DATA_PATH):,} bytes")
         try:
             df = pd.read_csv(DATA_PATH)
             rows, cols = df.shape
@@ -119,9 +130,11 @@ def load_or_generate_data():
         # Ensure BASE_DIR is in path for imports
         if BASE_DIR not in sys.path:
             sys.path.insert(0, BASE_DIR)
+            print(f"[DEBUG] Added BASE_DIR to sys.path: {BASE_DIR}")
         
         # Import generator
         print(f"[IMPORT] Attempting: from data.dataset import generate_dataset")
+        print(f"[DEBUG] sys.path[0]: {sys.path[0]}")
         from data.dataset import generate_dataset
         
         # Generate data
@@ -145,6 +158,8 @@ def load_or_generate_data():
     except ImportError as e:
         print(f"[FATAL] Cannot import dataset generator: {e}")
         print(f"[INFO] Expected file: {os.path.join(BASE_DIR, 'data', 'dataset.py')}")
+        print(f"[DEBUG] BASE_DIR: {BASE_DIR}")
+        print(f"[DEBUG] sys.path: {sys.path[:3]}")
         sys.exit(1)
     except Exception as e:
         print(f"[FATAL] Dataset generation failed: {e}")
@@ -250,20 +265,27 @@ def train_model(df):
 # ============================================================================
 
 def save_artifacts(ensemble, le, symptom_cols, test_acc, cv_mean):
-    """Save all model artifacts."""
+    """Save all model artifacts with comprehensive verification."""
     print("\n[STEP 3] SAVING ARTIFACTS")
     print("=" * 70)
     
     # Save model
     print(f"\n[SAVE] Model: {MODEL_PATH}")
     try:
-        joblib.dump(ensemble, MODEL_PATH)
+        joblib.dump(ensemble, MODEL_PATH, compress=3)
+        # Verify immediately
         if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"Model not created: {MODEL_PATH}")
+            raise FileNotFoundError(f"Model file not created: {MODEL_PATH}")
         size_mb = os.path.getsize(MODEL_PATH) / (1024**2)
-        print(f"[OK] Saved ({size_mb:.1f} MB)")
+        size_bytes = os.path.getsize(MODEL_PATH)
+        # Test reload
+        test_model = joblib.load(MODEL_PATH)
+        print(f"[OK] Saved ({size_mb:.1f} MB = {size_bytes:,} bytes)")
+        print(f"[OK] Verified loadable: {type(test_model).__name__}")
+        del test_model
     except Exception as e:
         print(f"[FATAL] Model save failed: {e}")
+        traceback.print_exc()
         sys.exit(1)
     
     # Save encoder
@@ -273,9 +295,14 @@ def save_artifacts(ensemble, le, symptom_cols, test_acc, cv_mean):
         if not os.path.exists(ENCODER_PATH):
             raise FileNotFoundError(f"Encoder not created: {ENCODER_PATH}")
         size_b = os.path.getsize(ENCODER_PATH)
+        # Test reload
+        test_enc = joblib.load(ENCODER_PATH)
         print(f"[OK] Saved ({size_b} bytes)")
+        print(f"[OK] Verified: {len(test_enc.classes_)} disease classes")
+        del test_enc
     except Exception as e:
         print(f"[FATAL] Encoder save failed: {e}")
+        traceback.print_exc()
         sys.exit(1)
     
     # Save symptoms
@@ -286,9 +313,14 @@ def save_artifacts(ensemble, le, symptom_cols, test_acc, cv_mean):
         if not os.path.exists(SYMPTOMS_PATH):
             raise FileNotFoundError(f"Symptoms not created: {SYMPTOMS_PATH}")
         size_b = os.path.getsize(SYMPTOMS_PATH)
+        # Test reload
+        with open(SYMPTOMS_PATH) as f:
+            test_syms = json.load(f)
         print(f"[OK] Saved ({size_b} bytes)")
+        print(f"[OK] Verified: {len(test_syms)} symptoms")
     except Exception as e:
         print(f"[FATAL] Symptoms save failed: {e}")
+        traceback.print_exc()
         sys.exit(1)
     
     # Save metadata
@@ -306,9 +338,14 @@ def save_artifacts(ensemble, le, symptom_cols, test_acc, cv_mean):
         if not os.path.exists(META_PATH):
             raise FileNotFoundError(f"Metadata not created: {META_PATH}")
         size_b = os.path.getsize(META_PATH)
+        # Test reload
+        with open(META_PATH) as f:
+            test_meta = json.load(f)
         print(f"[OK] Saved ({size_b} bytes)")
+        print(f"[OK] Verified: {len(test_meta['diseases'])} diseases")
     except Exception as e:
         print(f"[FATAL] Metadata save failed: {e}")
+        traceback.print_exc()
         sys.exit(1)
 
 # ============================================================================
@@ -316,9 +353,11 @@ def save_artifacts(ensemble, le, symptom_cols, test_acc, cv_mean):
 # ============================================================================
 
 def verify_all_files():
-    """Verify all files exist."""
-    print("\n[STEP 4] VERIFICATION")
+    """Verify all files exist with detailed reporting."""
+    print("\n[STEP 4] FINAL VERIFICATION")
     print("=" * 70)
+    print(f"[CHECK] Models directory: {MODELS_DIR}")
+    print(f"[CHECK] Directory exists: {os.path.isdir(MODELS_DIR)}")
     
     files = {
         "Model": MODEL_PATH,
@@ -329,18 +368,35 @@ def verify_all_files():
     
     all_ok = True
     for name, path in files.items():
-        exists = os.path.exists(path)
-        status = "[OK]" if exists else "[MISSING]"
-        size = os.path.getsize(path) if exists else 0
-        print(f"{status} {name:10} {path} ({size:,} bytes)")
-        if not exists:
+        if os.path.exists(path):
+            is_file = os.path.isfile(path)
+            size = os.path.getsize(path)
+            is_readable = os.access(path, os.R_OK)
+            status = "[OK]" if (is_file and is_readable) else "[WARNING]"
+            print(f"{status} {name:10} {path}")
+            print(f"       Size: {size:,} bytes | File: {is_file} | Readable: {is_readable}")
+            if not (is_file and is_readable and size > 0):
+                all_ok = False
+        else:
+            print(f"[MISSING] {name:10} {path}")
             all_ok = False
     
     if not all_ok:
-        print("\n[FATAL] Not all files created!")
+        print("\n[ERROR] Directory listing:")
+        try:
+            contents = os.listdir(MODELS_DIR)
+            for item in contents:
+                full_path = os.path.join(MODELS_DIR, item)
+                size = os.path.getsize(full_path) if os.path.isfile(full_path) else -1
+                print(f"  {item} ({size} bytes)")
+        except Exception as e:
+            print(f"  [ERROR] Cannot list directory: {e}")
+        
+        print("\n[FATAL] Not all required files created!")
         sys.exit(1)
     
-    print("\n[OK] All files verified!")
+    print("\n[OK] All 4 required files present and readable!")
+    return True
 
 # ============================================================================
 # MAIN ENTRY POINT
@@ -349,7 +405,12 @@ def verify_all_files():
 if __name__ == "__main__":
     try:
         print("\n" + "=" * 70)
-        print("[MEDCARE ML] TRAINING PIPELINE")
+        print("[MEDCARE ML] TRAINING PIPELINE - PRODUCTION BUILD")
+        print("=" * 70)
+        print(f"[INFO] Python {sys.version}")
+        print(f"[INFO] scikit-learn {__import__('sklearn').__version__}")
+        print(f"[INFO] Platform: {sys.platform}")
+        print(f"[INFO] PID: {os.getpid()}")
         print("=" * 70)
         
         # Step 1: Load or generate data
@@ -358,28 +419,38 @@ if __name__ == "__main__":
         # Step 2: Train model
         ensemble, le, symptom_cols, test_acc, cv_mean = train_model(df)
         
-        # Step 3: Save artifacts
+        # Step 3: Save artifacts with verification
         save_artifacts(ensemble, le, symptom_cols, test_acc, cv_mean)
         
-        # Step 4: Verify
+        # Step 4: Final verification
         verify_all_files()
         
         # Success
         print("\n" + "=" * 70)
-        print("[SUCCESS] TRAINING COMPLETED")
+        print("[SUCCESS] TRAINING COMPLETED SUCCESSFULLY")
         print("=" * 70)
-        print(f"Accuracy: {test_acc:.4f}")
-        print(f"Diseases: {len(le.classes_)}")
-        print(f"Symptoms: {len(symptom_cols)}")
+        print(f"Test Accuracy:  {test_acc:.4f} (94%+ expected)")
+        print(f"CV Accuracy:    {cv_mean:.4f}")
+        print(f"Diseases:       {len(le.classes_)}")
+        print(f"Symptoms:       {len(symptom_cols)}")
+        print(f"Model Files:    {MODELS_DIR}")
+        print("=" * 70)
+        print(f"[INFO] Exiting with status code 0 (SUCCESS)")
         print("=" * 70 + "\n")
         
         sys.exit(0)
         
     except Exception as e:
         print("\n" + "=" * 70)
-        print("[FATAL] UNEXPECTED ERROR")
+        print("[FATAL] TRAINING FAILED - UNEXPECTED ERROR")
         print("=" * 70)
-        print(f"Error: {type(e).__name__}: {e}")
+        print(f"Error Type: {type(e).__name__}")
+        print(f"Error Message: {e}")
+        print("=" * 70)
+        print("[TRACEBACK]")
         traceback.print_exc()
+        print("=" * 70)
+        print(f"[INFO] Exiting with status code 1 (FAILURE)")
         print("=" * 70 + "\n")
+        
         sys.exit(1)

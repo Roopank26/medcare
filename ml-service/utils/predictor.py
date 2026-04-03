@@ -3,11 +3,21 @@ Medcare ML - Predictor Utility
 Loads the trained model and maps free-text symptoms to predictions.
 """
 
-import os, json, re
+import os, json, re, traceback, sys
 import numpy as np
 import joblib
 
-BASE_DIR      = os.path.dirname(os.path.dirname(__file__))
+# Use absolute path to ml-service directory
+# If predictor.py is at /app/ml-service/utils/predictor.py (Render)
+# Then: dirname(__file__) = /app/ml-service/utils
+#       dirname(dirname(__file__)) = /app/ml-service ✓
+BASE_DIR      = os.path.dirname(os.path.abspath(__file__))  # /app/ml-service/utils
+BASE_DIR      = os.path.dirname(BASE_DIR)  # /app/ml-service (go up one level)
+
+# Ensure BASE_DIR is valid
+if not os.path.isabs(BASE_DIR):
+    BASE_DIR = os.path.abspath(BASE_DIR)
+
 MODELS_DIR    = os.path.join(BASE_DIR, "models")
 MODEL_PATH    = os.path.join(MODELS_DIR, "medcare_model.pkl")
 ENCODER_PATH  = os.path.join(MODELS_DIR, "label_encoder.pkl")
