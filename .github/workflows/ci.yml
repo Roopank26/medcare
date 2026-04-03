@@ -1,0 +1,169 @@
+# Medcare — CI/CD Pipeline (Phase 4)
+# Runs on every push and PR to main/develop
+# Pipeline: Install → Lint → Test → Build → (Deploy on main)
+
+name: Medcare CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ── Frontend ──────────────────────────────────────────────────
+  frontend:
+    name: Frontend (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm test -- --watchAll=false --passWithNoTests --coverage
+        env:
+          CI: true
+          REACT_APP_FIREBASE_API_KEY: test-key
+          REACT_APP_FIREBASE_AUTH_DOMAIN: test.firebaseapp.com
+          REACT_APP_FIREBASE_PROJECT_ID: test-project
+          REACT_APP_FIREBASE_STORAGE_BUCKET: test.appspot.com
+          REACT_APP_FIREBASE_MESSAGING_SENDER_ID: '123456'
+          REACT_APP_FIREBASE_APP_ID: '1:123456:web:abc'
+
+      - name: Build
+        run: npm run build
+        env:
+          CI: false   # Prevents warnings from failing the build
+          REACT_APP_FIREBASE_API_KEY: ${{ secrets.REACT_APP_FIREBASE_API_KEY }}
+          REACT_APP_FIREBASE_AUTH_DOMAIN: ${{ secrets.REACT_APP_FIREBASE_AUTH_DOMAIN }}
+          REACT_APP_FIREBASE_PROJECT_ID: ${{ secrets.REACT_APP_FIREBASE_PROJECT_ID }}
+          REACT_APP_FIREBASE_STORAGE_BUCKET: ${{ secrets.REACT_APP_FIREBASE_STORAGE_BUCKET }}
+          REACT_APP_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.REACT_APP_FIREBASE_MESSAGING_SENDER_ID }}
+          REACT_APP_FIREBASE_APP_ID: ${{ secrets.REACT_APP_FIREBASE_APP_ID }}
+          REACT_APP_BACKEND_URL: ${{ secrets.REACT_APP_BACKEND_URL || 'http://localhost:5000' }}
+          REACT_APP_ML_URL: ${{ secrets.REACT_APP_ML_URL || 'http://localhost:5001' }}
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          directory: ./client/coverage
+
+  # ── Backend ───────────────────────────────────────────────────
+  backend:
+    name: Backend (Express)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm test -- --passWithNoTests --forceExit
+        env:
+          NODE_ENV: test
+
+  # ── ML Service ────────────────────────────────────────────────
+  ml-service:
+    name: ML Service (Flask)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./ml-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ml-service/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest pytest-cov
+
+      - name: Run tests
+        run: pytest tests/ -v --tb=short --cov=. --cov-report=xml
+        env:
+          FLASK_ENV: testing
+          LOW_CONFIDENCE_THRESHOLD: '40'
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          directory: ./ml-service
+
+  # ── Docker build check ────────────────────────────────────────
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    needs: [frontend, backend, ml-service]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./client
+          file: ./client/Dockerfile
+          push: false
+          tags: medcare-frontend:ci
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: false
+          tags: medcare-backend:ci
+
+      - name: Build ML image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./ml-service
+          file: ./ml-service/Dockerfile
+          push: false
+          tags: medcare-ml:ci

@@ -1,0 +1,78 @@
+# Medcare — Docker Compose (Phase 10)
+# Usage:
+#   docker-compose up --build
+# Secrets: copy .env.example to .env and fill in values. NEVER commit .env.
+
+version: "3.9"
+
+services:
+  # ── React Frontend ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_FIREBASE_API_KEY:              ${REACT_APP_FIREBASE_API_KEY}
+        REACT_APP_FIREBASE_AUTH_DOMAIN:          ${REACT_APP_FIREBASE_AUTH_DOMAIN}
+        REACT_APP_FIREBASE_PROJECT_ID:           ${REACT_APP_FIREBASE_PROJECT_ID}
+        REACT_APP_FIREBASE_STORAGE_BUCKET:       ${REACT_APP_FIREBASE_STORAGE_BUCKET}
+        REACT_APP_FIREBASE_MESSAGING_SENDER_ID:  ${REACT_APP_FIREBASE_MESSAGING_SENDER_ID}
+        REACT_APP_FIREBASE_APP_ID:               ${REACT_APP_FIREBASE_APP_ID}
+        REACT_APP_ML_URL:                        ${REACT_APP_ML_URL:-http://ml-service:5001}
+        REACT_APP_SENTRY_DSN:                    ${REACT_APP_SENTRY_DSN:-}
+        REACT_APP_VERSION:                       ${REACT_APP_VERSION:-4.0.0}
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+      - ml-service
+    restart: unless-stopped
+    networks:
+      - medcare-net
+
+  # ── Express Backend ───────────────────────────────────────
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV:                      production
+      PORT:                          5000
+      ALLOWED_ORIGINS:               ${ALLOWED_ORIGINS:-http://localhost:3000}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON}
+    restart: unless-stopped
+    networks:
+      - medcare-net
+    healthcheck:
+      test:     ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout:  5s
+      retries:  3
+
+  # ── Flask ML Service ──────────────────────────────────────
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      FLASK_ENV:                production
+      ML_PORT:                  5001
+      ALLOWED_ORIGINS:          ${ALLOWED_ORIGINS:-http://localhost:3000}
+      OPENAI_API_KEY:           ${OPENAI_API_KEY:-}
+      LOW_CONFIDENCE_THRESHOLD: ${LOW_CONFIDENCE_THRESHOLD:-40}
+    volumes:
+      - ml-models:/app/models  # persist trained model across restarts
+    restart: unless-stopped
+    networks:
+      - medcare-net
+
+networks:
+  medcare-net:
+    driver: bridge
+
+volumes:
+  ml-models:

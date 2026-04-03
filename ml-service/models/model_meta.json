@@ -1,0 +1,26 @@
+{
+  "diseases": [
+    "Allergic Reaction",
+    "Anemia",
+    "Anxiety Disorder",
+    "Asthma",
+    "Bronchitis",
+    "COVID-19",
+    "Common Cold",
+    "Dengue Fever",
+    "Diabetes (Type 2)",
+    "Gastroenteritis",
+    "Hypertension",
+    "Influenza (Flu)",
+    "Malaria",
+    "Meningitis",
+    "Migraine",
+    "Pneumonia",
+    "Typhoid Fever",
+    "Urinary Tract Infection (UTI)"
+  ],
+  "n_symptoms": 52,
+  "n_samples": 2700,
+  "test_accuracy": 0.937,
+  "cv_accuracy": 0.9504
+}

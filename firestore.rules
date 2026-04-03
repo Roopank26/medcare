@@ -1,0 +1,133 @@
+// ============================================================
+//  Medcare — Firestore Security Rules (Phase 7 updated)
+//
+//  Apply via: Firebase Console → Firestore → Rules tab
+//  OR:        firebase deploy --only firestore:rules
+// ============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isDoctor() {
+      return isAuth() && getRole() == "doctor";
+    }
+
+
+    // ── users/{uid} ───────────────────────────────────────────
+    match /users/{uid} {
+      allow read:   if isAuth() && isOwner(uid);
+      allow create: if isAuth() && isOwner(uid)
+                    && request.resource.data.keys().hasAll(["uid","email","role","createdAt"])
+                    && request.resource.data.role in ["patient","doctor"];
+      allow update: if isAuth() && isOwner(uid)
+                    && !request.resource.data.diff(resource.data)
+                        .affectedKeys().hasAny(["role","email","uid"]);
+      allow delete: if false;
+    }
+
+
+    // ── patients/{patientId} ──────────────────────────────────
+    match /patients/{patientId} {
+      allow read:   if isDoctor() && resource.data.doctorId == request.auth.uid;
+      allow create: if isDoctor()
+                    && request.resource.data.doctorId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["name","age","condition","doctorId"]);
+      allow update: if isDoctor() && resource.data.doctorId == request.auth.uid;
+      allow delete: if isDoctor() && resource.data.doctorId == request.auth.uid;
+    }
+
+
+    // ── symptoms/{symId} ─────────────────────────────────────
+    match /symptoms/{symId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["userId","symptoms","diagnosis"]);
+      allow read:   if isAuth()
+                    && (resource.data.userId == request.auth.uid || isDoctor());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+
+    // ── reports/{reportId} ───────────────────────────────────
+    match /reports/{reportId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["userId","filename","type"]);
+      allow read:   if isAuth()
+                    && (resource.data.userId == request.auth.uid || isDoctor());
+      allow update: if isAuth() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+
+    // ── appointments/{apptId} ─────────────────────────────────
+    match /appointments/{apptId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["userId","type","date","status"]);
+      allow read:   if isAuth()
+                    && (resource.data.userId   == request.auth.uid
+                     || resource.data.doctorId == request.auth.uid
+                     || isDoctor());
+      allow update: if isAuth()
+                    && (resource.data.userId   == request.auth.uid
+                     || resource.data.doctorId == request.auth.uid
+                     || isDoctor());
+      allow delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+
+    // ── analytics/{docId} ─────────────────────────────────────
+    // Written by the frontend analytics module (batched events).
+    match /analytics/{docId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid;
+      allow read:   if isDoctor();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+
+    // ── chatFeedback/{docId} ── Phase 7 ──────────────────────
+    // Users write their own feedback. Doctors can read all for retraining.
+    match /chatFeedback/{docId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["userId","helpful"]);
+      allow read:   if isAuth()
+                    && (resource.data.userId == request.auth.uid || isDoctor());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+
+    // ── predictionFeedback/{docId} ── Phase 7 ────────────────
+    // ML prediction feedback for retraining dataset.
+    match /predictionFeedback/{docId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["userId","symptoms","disease","helpful"]);
+      allow read:   if isAuth()
+                    && (resource.data.userId == request.auth.uid || isDoctor());
+      allow update: if false;
+      allow delete: if false;
+    }
+
+  }
+}

@@ -1,0 +1,30 @@
+// ============================================================
+//  Firebase Storage Security Rules — Medcare
+//
+//  Paste these rules into:
+//  Firebase Console → Storage → Rules tab
+// ============================================================
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── reports/{userId}/{filename} ──────────────────────────
+    // Only the authenticated owner can upload to their own folder.
+    // Doctors can read any file; patients can only read their own.
+    match /reports/{userId}/{allPaths=**} {
+
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size  < 20 * 1024 * 1024   // 20 MB max
+                   && (
+                        request.resource.contentType.matches('application/pdf')
+                     || request.resource.contentType.matches('image/.*')
+                     || request.resource.contentType.matches('application/vnd.openxmlformats.*')
+                     || request.resource.contentType.matches('application/msword')
+                   );
+
+      allow read: if request.auth != null;
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "medcare",
+  "version": "3.0.0",
+  "description": "Medcare — AI-Powered Smart Healthcare System",
+  "scripts": {
+    "install-all": "npm install && cd server && npm install && cd ../client && npm install",
+    "dev": "concurrently \"cd server && npm start\" \"cd client && npm start\" --names \"EXPRESS,REACT\" --prefix-colors \"blue,green\"",
+    "dev:full": "concurrently \"cd server && npm start\" \"cd client && npm start\" \"cd ml-service && python app.py\" --names \"EXPRESS,REACT,ML\" --prefix-colors \"blue,green,magenta\"",
+    "start:server": "cd server && npm start",
+    "start:client": "cd client && npm start",
+    "start:ml": "cd ml-service && python app.py",
+    "train:ml": "cd ml-service && python train_model.py",
+    "setup:ml": "cd ml-service && pip install -r requirements.txt && python train_model.py"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
