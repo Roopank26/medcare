@@ -20,7 +20,7 @@
     "Urinary Tract Infection (UTI)"
   ],
   "n_symptoms": 52,
-  "n_samples": 2700,
-  "test_accuracy": 0.937,
-  "cv_accuracy": 0.9504
+  "n_samples": 52,
+  "test_accuracy": 0.9407,
+  "cv_accuracy": 0.9463
 }

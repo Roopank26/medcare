@@ -8,7 +8,7 @@
  * - Analytics page view tracking
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
@@ -18,6 +18,12 @@ import { StatCardSkeleton, MedicalDisclaimer } from "../shared/UI";
 import analytics from "../../utils/analytics";
 import logger from "../../utils/logger";
 import useToast from "../../hooks/useToast";
+
+/** Converts any casing to Title Case: "BRONCHITIS" → "Bronchitis" */
+const toTitleCase = (str) => {
+  if (!str) return "";
+  return String(str).toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+};
 
 // Severity → numeric score for trend chart
 const SEV_SCORE = { Low: 1, Medium: 2, High: 3, Critical: 4, Unknown: 0 };
@@ -117,6 +123,9 @@ const SeverityTip = ({ active, payload }) => {
 const PatientOverview = ({ user, setActiveSection }) => {
   const { user: authUser } = useAuth();
   const toast = useToast();
+  // Use a ref so `load` never has `toast` as a dep (would cause infinite loops)
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
   const [symptoms, setSymptoms] = useState([]);
   const [reports,  setReports]  = useState([]);
@@ -133,16 +142,18 @@ const PatientOverview = ({ user, setActiveSection }) => {
         getSymptomsDoc(authUser.uid).catch(() => ({ symptoms: [], error: "fetch_failed" })),
         getReportsDoc(authUser.uid).catch(() => ({ reports: [], error: "fetch_failed" })),
       ]);
-      if (e1 || e2) toast.error("Could not load all overview data. Pull to refresh.");
-      setSymptoms(s);
+      if (e1 || e2) toastRef.current.error("Could not load all overview data. Pull to refresh.");
+      // Normalize disease names
+      setSymptoms((s || []).map((item) => ({ ...item, diagnosis: toTitleCase(item.diagnosis) })));
       setReports(r);
     } catch (err) {
       logger.error("[PatientOverview] Load failed", err);
-      toast.error("Could not load overview data.");
+      toastRef.current.error("Could not load overview data.");
     } finally {
       setLoading(false);
     }
-  }, [authUser?.uid, toast]);
+  // toast intentionally omitted — use toastRef
+  }, [authUser?.uid]);
 
   useEffect(() => {
     load();

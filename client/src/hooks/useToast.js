@@ -12,6 +12,7 @@
  *   toast.dismiss();
  */
 
+import { useMemo } from "react";
 import toast from "react-hot-toast";
 
 const BASE_STYLE = {
@@ -24,59 +25,59 @@ const BASE_STYLE = {
 };
 
 const useToast = () => {
-  const success = (message, options = {}) =>
-    toast.success(message, {
-      duration: 4000,
-      style: { ...BASE_STYLE, background: "#EDFAF4", color: "#0E6A35", border: "1px solid #C8F0DB" },
-      iconTheme: { primary: "#20B05A", secondary: "#fff" },
-      ...options,
-    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  return useMemo(() => ({
+    success: (message, options = {}) =>
+      toast.success(message, {
+        duration: 4000,
+        style: { ...BASE_STYLE, background: "#EDFAF4", color: "#0E6A35", border: "1px solid #C8F0DB" },
+        iconTheme: { primary: "#20B05A", secondary: "#fff" },
+        ...options,
+      }),
 
-  const error = (message, options = {}) =>
-    toast.error(message, {
-      duration: 5000,
-      style: { ...BASE_STYLE, background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FECACA" },
-      iconTheme: { primary: "#EF4444", secondary: "#fff" },
-      ...options,
-    });
+    error: (message, options = {}) =>
+      toast.error(message, {
+        duration: 5000,
+        style: { ...BASE_STYLE, background: "#FEF2F2", color: "#B91C1C", border: "1px solid #FECACA" },
+        iconTheme: { primary: "#EF4444", secondary: "#fff" },
+        ...options,
+      }),
 
-  const info = (message, options = {}) =>
-    toast(message, {
-      duration: 4000,
-      icon: "ℹ️",
-      style: { ...BASE_STYLE, background: "#EFF6FF", color: "#1E40AF", border: "1px solid #BFDBFE" },
-      ...options,
-    });
+    info: (message, options = {}) =>
+      toast(message, {
+        duration: 4000,
+        icon: "ℹ️",
+        style: { ...BASE_STYLE, background: "#EFF6FF", color: "#1E40AF", border: "1px solid #BFDBFE" },
+        ...options,
+      }),
 
-  const warning = (message, options = {}) =>
-    toast(message, {
-      duration: 4500,
-      icon: "⚠️",
-      style: { ...BASE_STYLE, background: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A" },
-      ...options,
-    });
+    warning: (message, options = {}) =>
+      toast(message, {
+        duration: 4500,
+        icon: "⚠️",
+        style: { ...BASE_STYLE, background: "#FFFBEB", color: "#B45309", border: "1px solid #FDE68A" },
+        ...options,
+      }),
 
-  const loading = (message, options = {}) =>
-    toast.loading(message, {
-      style: { ...BASE_STYLE, background: "#EBF4FF", color: "#1A6DBF", border: "1px solid #C3DFFE" },
-      ...options,
-    });
+    loading: (message, options = {}) =>
+      toast.loading(message, {
+        style: { ...BASE_STYLE, background: "#EBF4FF", color: "#1A6DBF", border: "1px solid #C3DFFE" },
+        ...options,
+      }),
 
-  const dismiss = (id) => toast.dismiss(id);
+    dismiss: (id) => toast.dismiss(id),
 
-  /** Show a loading toast, then resolve it to success or error. */
-  const promise = (promiseFn, { loading: loadMsg, success: successMsg, error: errorMsg }) =>
-    toast.promise(promiseFn, {
-      loading: loadMsg || "Processing…",
-      success: successMsg || "Done!",
-      error:   (err) => errorMsg || err?.message || "Something went wrong.",
-    }, {
-      style: BASE_STYLE,
-      success: { duration: 3000, iconTheme: { primary: "#20B05A", secondary: "#fff" } },
-      error:   { duration: 5000, iconTheme: { primary: "#EF4444", secondary: "#fff" } },
-    });
-
-  return { success, error, info, warning, loading, dismiss, promise };
+    promise: (promiseFn, { loading: loadMsg, success: successMsg, error: errorMsg }) =>
+      toast.promise(promiseFn, {
+        loading: loadMsg || "Processing…",
+        success: successMsg || "Done!",
+        error:   (err) => errorMsg || err?.message || "Something went wrong.",
+      }, {
+        style: BASE_STYLE,
+        success: { duration: 3000, iconTheme: { primary: "#20B05A", secondary: "#fff" } },
+        error:   { duration: 5000, iconTheme: { primary: "#EF4444", secondary: "#fff" } },
+      }),
+  }), []); // stable reference — toast lib fns never change
 };
 
 export default useToast;

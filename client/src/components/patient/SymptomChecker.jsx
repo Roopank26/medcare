@@ -23,6 +23,13 @@ import analytics, { EVENTS } from "../../utils/analytics";
 import logger from "../../utils/logger";
 import useToast from "../../hooks/useToast";
 
+// ── Helpers ─────────────────────────────────────────────────
+/** Converts any casing to Title Case: "BRONCHITIS" → "Bronchitis" */
+const toTitleCase = (str) => {
+  if (!str) return "";
+  return String(str).toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+};
+
 // ── Severity config ──────────────────────────────────────────
 const SEV = {
   Low:      { color: "text-green-700 bg-green-50 border-green-200",  bar: "bg-green-500",  icon: "🟢", label: "Low Risk"      },
@@ -182,16 +189,20 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
       setFromCache(!!response.fromCache);
       logger.perf("SymptomChecker.predict", ms);
 
-      // Save to Firestore
+      // Save to Firestore — normalize disease name and severity casing for clean storage
       setSaving(true);
       const { error: saveErr } = await saveSymptomDoc(user.uid, {
         symptoms:              symptomText,
         selectedTags:          all,
-        diagnosis:             p.disease,
+        diagnosis:             toTitleCase(p.disease),
         confidence:            p.confidence,
-        severity:              p.severity,
+        severity:              p.severity
+          ? p.severity.charAt(0).toUpperCase() + p.severity.slice(1).toLowerCase()
+          : undefined,
         recommendations:       p.precautions    || [],
-        alternatives:          p.alternatives   || [],
+        alternatives:          (p.alternatives  || []).map((a) => ({
+          ...a, disease: toTitleCase(a.disease),
+        })),
         contributing_factors:  p.contributing_factors || [],
         reasoning:             p.reasoning      || "",
         action:                p.action,
@@ -204,7 +215,10 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
 
       setResult(p);
       setExpandExplain(true);
-      if (inputText) setSelectedTags((prev) => [...prev, inputText.trim()]);
+      // ✅ FIX: inputText was already included in `all` (line above handleAnalyze).
+      // Adding it again here caused duplicate symptom tags in the UI.
+      // Instead, sync selectedTags to the full deduplicated `all` list.
+      setSelectedTags(Array.from(new Set(all.map((t) => t.trim()).filter(Boolean))));
       setInputText("");
       if (onNewDiagnosis) onNewDiagnosis(p);
 
@@ -364,7 +378,7 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
 
       {/* ── Results card ───────────────────────────────────── */}
       {result && (
-        <div className="card border border-blue-100 animate-fade-in space-y-5">
+        <div className="card border border-blue-100 animate-fade-in space-y-5" style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
 
           {/* Header */}
           <div className="flex items-start justify-between flex-wrap gap-3">
@@ -400,9 +414,11 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
           </div>
 
           {/* Diagnosis */}
-          <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
+          <div className="bg-primary-50 rounded-xl p-4 border border-primary-100" style={{ wordWrap: "break-word", overflowWrap: "break-word" }}>
             <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Predicted Condition</p>
-            <p className="font-display font-bold text-xl text-gray-900">{result.disease}</p>
+            <p className="font-display font-bold text-xl text-gray-900" style={{ wordBreak: "break-word" }}>
+              {toTitleCase(result.disease)}
+            </p>
           </div>
 
           {/* Confidence bar */}
@@ -544,7 +560,7 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
                   <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
                     <span className="text-base">{alt.emoji || "🩺"}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-gray-700 truncate">{alt.disease}</p>
+                      <p className="text-xs font-semibold text-gray-700 truncate">{toTitleCase(alt.disease)}</p>
                       {alt.severity && <p className="text-xs text-gray-400">{alt.severity} risk</p>}
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">

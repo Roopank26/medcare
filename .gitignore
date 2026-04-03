@@ -103,3 +103,9 @@ docker-compose.override.yml
 temp/
 tmp/
 *.bak
+
+# Python compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
