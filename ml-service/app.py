@@ -45,11 +45,25 @@ logger.propagate = False
 app = Flask(__name__)
 IS_PROD = os.getenv("FLASK_ENV") == "production"
 
-ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
-).split(",")
+# Production CORS: Accept deployment URLs + localhost for dev
+DEFAULT_ORIGINS = (
+    "https://medcare-theta-nine.vercel.app,"  # Main Vercel frontend
+    "https://medcare.vercel.app,"             # Alternative Vercel URL pattern
+    "http://localhost:3000,"                   # Local development
+    "http://127.0.0.1:3000"                    # Localhost IPv4
+)
+ALLOWED_ORIGINS = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",") if o.strip()]
 
-CORS(app, origins=ALLOWED_ORIGINS, supports_credentials=True)
+# Log CORS configuration
+logger.info(f"CORS enabled for origins: {', '.join(ALLOWED_ORIGINS)}")
+
+CORS(
+    app,
+    origins=ALLOWED_ORIGINS,
+    supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+    methods=["GET", "POST", "OPTIONS"]
+)
 
 # ── Rate limiting ─────────────────────────────────────────────
 try:
