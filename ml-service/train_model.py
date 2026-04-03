@@ -116,4 +116,43 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+    try:
+        print("\n" + "="*60)
+        print("[ML] MEDCARE ML MODEL TRAINING")
+        print("="*60)
+        
+        accuracy = train()
+        
+        # Verify all files were saved
+        assert os.path.exists(MODEL_PATH), f"Model file not created: {MODEL_PATH}"
+        assert os.path.exists(ENCODER_PATH), f"Encoder file not created: {ENCODER_PATH}"
+        assert os.path.exists(SYMPTOMS_PATH), f"Symptoms file not created: {SYMPTOMS_PATH}"
+        assert os.path.exists(META_PATH), f"Meta file not created: {META_PATH}"
+        
+        print("\n" + "="*60)
+        print(f"[✅] TRAINING COMPLETED SUCCESSFULLY")
+        print(f"[✅] Model Accuracy: {accuracy:.3f} (73% = good, 85%+ = excellent)")
+        print(f"[✅] Model saved: {MODEL_PATH}")
+        print(f"[✅] Encoder saved: {ENCODER_PATH}")
+        print(f"[✅] Symptoms saved: {SYMPTOMS_PATH}")
+        print(f"[✅] Metadata saved: {META_PATH}")
+        print("="*60 + "\n")
+        
+        sys.exit(0)  # Explicit success
+        
+    except AssertionError as e:
+        print("\n" + "="*60)
+        print(f"[❌] ASSERTION FAILED")
+        print(f"[❌] {str(e)}")
+        print("="*60 + "\n")
+        sys.exit(1)
+        
+    except Exception as e:
+        print("\n" + "="*60)
+        print(f"[❌] TRAINING FAILED: {type(e).__name__}")
+        print(f"[❌] Error: {str(e)}")
+        print("="*60)
+        import traceback
+        traceback.print_exc()
+        print("="*60 + "\n")
+        sys.exit(1)  # Explicit failure

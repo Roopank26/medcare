@@ -102,8 +102,21 @@ _stats = {
 }
 
 # ── Load ML model ─────────────────────────────────────────────
+print("\n[STARTUP] Initializing ML model...")
 predictor   = MedcarePredictor.get()
 model_ready = predictor.load()
+
+if not model_ready:
+    logger.error("MODEL_LOADING_FAILED", extra={
+        "status": "CRITICAL",
+        "message": "ML model failed to load - service degraded"
+    })
+    print("[⚠️  CRITICAL] ML Model Not Available!")
+    print("[⚠️  ] Service running but /predict will return 503 error")
+    print("[⚠️  ] To fix: run 'python train_model.py' in ml-service directory")
+else:
+    print("[✅] ML Model Ready - Service Fully Operational")
+    logger.info("MODEL_LOADED", extra={"status": "OK"})
 
 # ── Helpers ───────────────────────────────────────────────────
 def ok(data, status=200):
@@ -183,7 +196,12 @@ def predict():
         return err("symptoms text too long (max 2000 chars)", code="TOO_LONG")
 
     if not model_ready:
-        return err("ML model not loaded. Run: python train_model.py", 503, code="MODEL_NOT_READY")
+        return err(
+            "ML model not loaded - service degraded. Restart service to trigger model training. "
+            "If problem persists, run: python train_model.py",
+            503,
+            code="MODEL_NOT_READY"
+        )
 
     t0     = time.perf_counter()
     result = predictor.predict(symptoms)
@@ -320,13 +338,14 @@ if __name__ == "__main__":
     chat_mode = "OpenAI GPT" if os.getenv("OPENAI_API_KEY") else "Rule-based"
 
     print(f"\n{'='*58}")
-    print(f"  [ML] Medcare ML Service v4.1 (Phase 2 Hardened)")
-    print(f"  [NET] http://localhost:{port}")
-    print(f"  [MOD] Model:       {'OK' if model_ready else 'LOAD - Run train_model.py'}")
-    print(f"  [BOT] Chatbot:     {chat_mode}")
-    print(f"  [LOW-CONF] <%: {LOW_CONFIDENCE_THRESHOLD}%")
-    print(f"  [SEC] Rate limit: {'Enabled' if RATE_LIMIT_ENABLED else 'Disabled'}")
-    print(f"  [DB] Diseases:     {len(DISEASE_META)}")
+    print(f"  [ML] Medcare ML Service v4.1 (PRODUCTION)")
+    print(f"  [NET] Running on http://0.0.0.0:{port}")
+    model_status = "✅ READY" if model_ready else "❌ NOT LOADED"
+    print(f"  [MOD] Model: {model_status}")
+    print(f"  [BOT] Chatbot: {chat_mode}")
+    print(f"  [LOW-CONF] Threshold: {LOW_CONFIDENCE_THRESHOLD}%")
+    print(f"  [SEC] Rate Limiting: {'Enabled' if RATE_LIMIT_ENABLED else 'Disabled'}")
+    print(f"  [DB] Disease Classes: {len(DISEASE_META)}")
     print(f"{'='*58}\n")
 
     app.run(host="0.0.0.0", port=port, debug=False)

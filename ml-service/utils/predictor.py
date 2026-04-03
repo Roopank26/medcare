@@ -320,18 +320,75 @@ class MedcarePredictor:
         return cls._instance
 
     def load(self):
+        """
+        Load trained model, encoder, and symptoms list.
+        
+        Returns:
+            bool: True if all files loaded successfully, False otherwise
+        """
         if self._loaded:
             return True
+        
+        print(f"[MODEL] Loading from directory: {MODELS_DIR}")
+        
+        # Check if all required files exist
+        required_files = {
+            "model": MODEL_PATH,
+            "encoder": ENCODER_PATH,
+            "symptoms": SYMPTOMS_PATH,
+        }
+        
+        missing_files = {}
+        for name, path in required_files.items():
+            exists = os.path.exists(path)
+            status = "✅" if exists else "❌"
+            print(f"[CHECK] {status} {name}: {path}")
+            if not exists:
+                missing_files[name] = path
+        
+        if missing_files:
+            print(f"\n[ERROR] Model files missing! Cannot start without trained model.")
+            print(f"[ERROR] Missing files:")
+            for name, path in missing_files.items():
+                print(f"[ERROR]   - {name}: {path}")
+            print(f"\n[FIX] To train the model:");
+            print(f"[FIX]   cd {BASE_DIR}")
+            print(f"[FIX]   python train_model.py")
+            print(f"[FIX]")
+            return False
+        
         try:
-            self.model    = joblib.load(MODEL_PATH)
-            self.encoder  = joblib.load(ENCODER_PATH)
+            # Load model
+            print(f"[LOAD] Loading model...")
+            self.model = joblib.load(MODEL_PATH)
+            print(f"[LOAD] ✅ Model loaded: {type(self.model).__name__}")
+            
+            # Load encoder
+            print(f"[LOAD] Loading encoder...")
+            self.encoder = joblib.load(ENCODER_PATH)
+            n_diseases = len(self.encoder.classes_)
+            print(f"[LOAD] ✅ Encoder loaded: {n_diseases} disease classes")
+            
+            # Load symptoms
+            print(f"[LOAD] Loading symptoms...")
             with open(SYMPTOMS_PATH) as f:
                 self.symptoms = json.load(f)
+            n_symptoms = len(self.symptoms)
+            print(f"[LOAD] ✅ Symptoms loaded: {n_symptoms} features")
+            
             self._loaded = True
-            print("[OK] ML model loaded")
+            print(f"[✅] ML MODEL READY")
             return True
-        except FileNotFoundError:
-            print("[WARNING] Model not found -- run train_model.py first")
+            
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Invalid JSON in {SYMPTOMS_PATH}: {str(e)}")
+            return False
+            
+        except Exception as e:
+            print(f"[ERROR] Failed to load model: {type(e).__name__}")
+            print(f"[ERROR] {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def parse_symptoms(self, text_or_list):
