@@ -17,6 +17,14 @@ import logger from '../utils/logger';
 
 const ML_BASE = process.env.REACT_APP_ML_URL || 'http://localhost:5001';
 
+// Verify ML URL is configured correctly
+if (typeof window !== 'undefined') {
+  console.log('🔗 ML Service URL:', ML_BASE);
+  if (window.location.hostname !== 'localhost' && ML_BASE.includes('localhost')) {
+    console.warn('⚠️ WARNING: Production frontend using localhost ML URL. Check REACT_APP_ML_URL environment variable.');
+  }
+}
+
 const ML_API = axios.create({
   baseURL:         ML_BASE,
   timeout:         20_000,
@@ -41,12 +49,14 @@ ML_API.interceptors.response.use(
   },
   (err) => {
     if (!err.response || err.code === 'ECONNABORTED') {
-      return Promise.reject(
-        new Error('ML service offline. Start it: cd ml-service && python app.py')
-      );
+      const isProduction = process.env.NODE_ENV === 'production' || (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
+      const errorMsg = isProduction
+        ? `ML service unavailable (${ML_BASE}). Check service status at https://ml-service-1hgd.onrender.com/health`
+        : 'ML service offline. Start it: cd ml-service && python app.py';
+      return Promise.reject(new Error(errorMsg));
     }
     const msg = err.response?.data?.error || 'ML service returned an error.';
-    logger.error('[ML API] Request failed', err, { url: err.config?.url });
+    logger.error('[ML API] Request failed', err, { url: err.config?.url, ML_URL: ML_BASE });
     return Promise.reject(new Error(msg));
   }
 );

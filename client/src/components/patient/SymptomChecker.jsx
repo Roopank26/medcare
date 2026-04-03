@@ -163,7 +163,11 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
     const check = validateSymptoms(symptomText);
     if (!check.valid) { toast.warning(check.error); return; }
     if (mlStatus === "offline") {
-      toast.error("ML service is offline. Start it: cd ml-service && python app.py");
+      const isProduction = window.location.hostname !== 'localhost';
+      const msg = isProduction
+        ? "ML service is unavailable. Please try again in a moment."
+        : "ML service is offline. Start it: cd ml-service && python app.py";
+      toast.error(msg);
       return;
     }
 
