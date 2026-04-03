@@ -1,0 +1,50 @@
+services:
+  # ── BACKEND API ──────────────────────────────────────
+  - type: web
+    name: medcare-backend
+    env: node
+    region: oregon
+    plan: free
+    
+    # Build & start commands
+    buildCommand: npm install
+    startCommand: node server.js
+    
+    # Root directory
+    rootDir: server
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false  # Must be set in Render dashboard
+      - key: ALLOWED_ORIGINS
+        value: https://medcare-web.vercel.app  # Update after frontend deployed
+      - key: LOG_LEVEL
+        value: info
+
+  # ── ML SERVICE ────────────────────────────────────────
+  - type: web
+    name: medcare-ml
+    env: python
+    region: oregon
+    plan: free
+    
+    # Build & start commands
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -b 0.0.0.0:5000 app:app
+    
+    # Root directory
+    rootDir: ml-service
+    
+    # Environment variables
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: LOG_LEVEL
+        value: info
