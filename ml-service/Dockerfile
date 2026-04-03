@@ -31,7 +31,7 @@ RUN [ -f "models/medcare_model.pkl" ] || { \
         echo "[ERROR] Symptoms file not found: models/symptoms_list.json"; \
         exit 1; \
     } && \
-    echo "[BUILD] ✅ All model files verified"
+    echo "[BUILD] [PASS] All model files verified"
 
 # Create non-root user and set permissions
 RUN groupadd -r mluser && useradd -r -g mluser mluser && \

@@ -85,7 +85,7 @@ DISEASE_META = {
             "Stay hydrated and rest",
             "Do not self-medicate - treatment depends on malaria type",
         ],
-        "emoji": "🦠",
+        "emoji": "[MALARIA]",
     },
     "Pneumonia": {
         "severity": "High",

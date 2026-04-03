@@ -111,11 +111,11 @@ if not model_ready:
         "status": "CRITICAL",
         "message": "ML model failed to load - service degraded"
     })
-    print("[⚠️  CRITICAL] ML Model Not Available!")
-    print("[⚠️  ] Service running but /predict will return 503 error")
-    print("[⚠️  ] To fix: run 'python train_model.py' in ml-service directory")
+    print("[WARN] ML Model Not Available!")
+    print("[WARN] Service running but /predict will return 503 error")
+    print("[WARN] To fix: run 'python train_model.py' in ml-service directory")
 else:
-    print("[✅] ML Model Ready - Service Fully Operational")
+    print("[PASS] ML Model Ready - Service Fully Operational")
     logger.info("MODEL_LOADED", extra={"status": "OK"})
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -340,7 +340,7 @@ if __name__ == "__main__":
     print(f"\n{'='*58}")
     print(f"  [ML] Medcare ML Service v4.1 (PRODUCTION)")
     print(f"  [NET] Running on http://0.0.0.0:{port}")
-    model_status = "✅ READY" if model_ready else "❌ NOT LOADED"
+    model_status = "READY" if model_ready else "NOT LOADED"
     print(f"  [MOD] Model: {model_status}")
     print(f"  [BOT] Chatbot: {chat_mode}")
     print(f"  [LOW-CONF] Threshold: {LOW_CONFIDENCE_THRESHOLD}%")

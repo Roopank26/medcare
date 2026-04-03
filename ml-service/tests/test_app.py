@@ -24,7 +24,7 @@ class MockPredictor:
                 "action": "Rest at home.", "precautions": ["Rest", "Hydrate"],
                 "matched_symptoms": ["fever"], "alternatives": [],
                 "contributing_factors": [], "confidence_breakdown": [],
-                "reasoning": "Fever is a primary indicator.", "emoji": "🤧",
+                "reasoning": "Fever is a primary indicator.", "emoji": "[FEVER]",
                 "symptom_count": 1,
             }
         # Return low-confidence result
@@ -33,7 +33,7 @@ class MockPredictor:
             "action": "Consult a doctor.", "precautions": [],
             "matched_symptoms": [], "alternatives": [],
             "contributing_factors": [], "confidence_breakdown": [],
-            "reasoning": "Insufficient symptoms.", "emoji": "🩺",
+            "reasoning": "Insufficient symptoms.", "emoji": "[CHECKUP]",
             "symptom_count": 0,
         }
 

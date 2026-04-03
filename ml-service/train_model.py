@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Medcare ML — Model Trainer
 Trains Random Forest, Decision Tree, and Naive Bayes classifiers.
@@ -30,14 +32,33 @@ META_PATH     = os.path.join(MODELS_DIR, "model_meta.json")
 
 
 def load_or_generate_data():
-    if not os.path.exists(DATA_PATH):
-        print("Dataset not found — generating…")
-        sys.path.insert(0, BASE_DIR)
+    """Load dataset from CSV or generate if missing."""
+    if os.path.exists(DATA_PATH):
+        print(f"[LOAD] Found existing dataset: {DATA_PATH}")
+        return pd.read_csv(DATA_PATH)
+    
+    # Dataset missing — generate it
+    print("[GENERATE] Dataset not found — generating…")
+    try:
+        # Import from data.dataset module
         from data.dataset import generate_dataset
         df = generate_dataset(samples_per_disease=150)
         df.to_csv(DATA_PATH, index=False)
-        print(f"[OK] Dataset generated: {len(df)} rows")
-    return pd.read_csv(DATA_PATH)
+        print(f"[PASS] Dataset generated: {len(df)} rows at {DATA_PATH}")
+        return df
+    except ImportError as e:
+        print(f"[WARN] Failed to import generate_dataset: {e}")
+        print("[WARN] Attempting direct import via sys.path...")
+        
+        # Fallback: add BASE_DIR to path and retry
+        if BASE_DIR not in sys.path:
+            sys.path.insert(0, BASE_DIR)
+        
+        from data.dataset import generate_dataset
+        df = generate_dataset(samples_per_disease=150)
+        df.to_csv(DATA_PATH, index=False)
+        print(f"[PASS] Dataset generated: {len(df)} rows at {DATA_PATH}")
+        return df
 
 
 def train():
@@ -130,27 +151,27 @@ if __name__ == "__main__":
         assert os.path.exists(META_PATH), f"Meta file not created: {META_PATH}"
         
         print("\n" + "="*60)
-        print(f"[✅] TRAINING COMPLETED SUCCESSFULLY")
-        print(f"[✅] Model Accuracy: {accuracy:.3f} (73% = good, 85%+ = excellent)")
-        print(f"[✅] Model saved: {MODEL_PATH}")
-        print(f"[✅] Encoder saved: {ENCODER_PATH}")
-        print(f"[✅] Symptoms saved: {SYMPTOMS_PATH}")
-        print(f"[✅] Metadata saved: {META_PATH}")
+        print("[PASS] TRAINING COMPLETED SUCCESSFULLY")
+        print(f"[PASS] Model Accuracy: {accuracy:.3f} (73% = good, 85%+ = excellent)")
+        print(f"[PASS] Model saved: {MODEL_PATH}")
+        print(f"[PASS] Encoder saved: {ENCODER_PATH}")
+        print(f"[PASS] Symptoms saved: {SYMPTOMS_PATH}")
+        print(f"[PASS] Metadata saved: {META_PATH}")
         print("="*60 + "\n")
         
         sys.exit(0)  # Explicit success
         
     except AssertionError as e:
         print("\n" + "="*60)
-        print(f"[❌] ASSERTION FAILED")
-        print(f"[❌] {str(e)}")
+        print("[FAIL] ASSERTION FAILED")
+        print(f"[FAIL] {str(e)}")
         print("="*60 + "\n")
         sys.exit(1)
         
     except Exception as e:
         print("\n" + "="*60)
-        print(f"[❌] TRAINING FAILED: {type(e).__name__}")
-        print(f"[❌] Error: {str(e)}")
+        print(f"[FAIL] TRAINING FAILED: {type(e).__name__}")
+        print(f"[FAIL] Error: {str(e)}")
         print("="*60)
         import traceback
         traceback.print_exc()
