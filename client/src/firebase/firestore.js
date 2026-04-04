@@ -330,21 +330,33 @@ export const subscribeToMedicalHistory = (userId, callback) => {
         return bTs - aTs;
       });
 
+      console.log("RAW DATA:", raw);
+
       const mapped = raw.map((d) => ({
-        ...d,
-        // Normalize Firestore field names → UI names
-        diagnosis: d.disease || d.diagnosis || "",
-        selectedTags: Array.isArray(d.symptoms) ? d.symptoms : [],
+        id: d.id,
+        diagnosis: d.disease || d.diagnosis || "Unknown",
+        selectedTags: Array.isArray(d.symptoms)
+          ? d.symptoms
+          : typeof d.symptoms === "string" && d.symptoms
+            ? d.symptoms.split(",").map((s) => s.trim()).filter(Boolean)
+            : [],
         createdAt: d.timestamp || null,
         timestamp: toISO(d.timestamp) || d.date || null,
-        // Ensure numeric confidence and safe severity
         confidence: Number(d.confidence) || 0,
         severity: d.severity
           ? d.severity.charAt(0).toUpperCase() + d.severity.slice(1).toLowerCase()
           : undefined,
+        action: d.action || null,
+        recommendations: Array.isArray(d.recommendations) ? d.recommendations : [],
+        alternatives: Array.isArray(d.alternatives) ? d.alternatives : [],
+        date: d.date || null,
+        userId: d.userId || null,
       }));
 
+      console.log("MAPPED DATA:", mapped);
       callback(mapped);
+
+
     },
     (err) => {
       console.error("[Firestore] subscribeToMedicalHistory error:", err.message);
