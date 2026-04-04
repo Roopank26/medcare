@@ -13,9 +13,9 @@
  * - Empty state handled cleanly for both filtered + unfiltered views.
  */
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getSymptomsDoc } from "../../firebase/firestore";
-import { useAuth } from "../../context/AuthContext";
 import { PageSpinner, EmptyState, ConfidenceBar, MedicalDisclaimer } from "../shared/UI";
 import useToast from "../../hooks/useToast";
 
@@ -188,11 +188,6 @@ const DetailModal = ({ item, onClose }) => {
 
 /* ── Main component ────────────────────────────────────────── */
 const MedicalHistory = () => {
-  const { user } = useAuth();
-
-  // ⚠️ Keep toast ref stable — never include toast in useCallback deps.
-  // useToast() now returns a stable useMemo reference, but we also use a ref
-  // as a belt-and-suspenders guard so the load function truly never changes.
   const toast = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
@@ -204,63 +199,56 @@ const MedicalHistory = () => {
   const [filterSev, setFilterSev] = useState("All");
   const [retryKey, setRetryKey] = useState(0);
 
-  // ── Fetch ──────────────────────────────────────────────────
-  // IMPORTANT: `toast` is intentionally excluded from deps — use toastRef instead.
-  // This ensures `load` has a stable reference and useEffect below fires only
-  // when user.uid or retryKey changes (not on every render).
-  const load = useCallback(async () => {
-    if (!user?.uid) {
-      console.warn("[MedicalHistory] No user UID — skipping fetch");
-      setLoading(false);
-      return;
-    }
-
-    console.log("UID:", user.uid);
+  // ── Fetch — waits for Firebase auth to resolve before querying ──
+  useEffect(() => {
     setLoading(true);
     setLoadError(null);
 
-    try {
-      const { symptoms, error } = await getSymptomsDoc(user.uid);
-      console.log("Docs:", symptoms?.length ?? 0);
+    const unsubscribe = onAuthStateChanged(getAuth(), async (currentUser) => {
+      console.log("USER:", currentUser);
 
-      if (error) {
-        setLoadError(error);
-        toastRef.current.error("Could not load medical history.");
-      } else {
-        // Belt-and-suspenders JS sort (latest first) — no Firestore index needed
-        const sorted = (symptoms || []).slice().sort((a, b) => {
-          const aTs = a.timestamp
-            ? new Date(a.timestamp).getTime()
-            : (a.createdAt?.seconds ?? 0) * 1000;
-          const bTs = b.timestamp
-            ? new Date(b.timestamp).getTime()
-            : (b.createdAt?.seconds ?? 0) * 1000;
-          return bTs - aTs;
-        });
-
-        // Normalize disease names and severity casing
-        const normalized = sorted.map((s) => ({
-          ...s,
-          diagnosis: toTitleCase(s.diagnosis),
-          severity: s.severity
-            ? s.severity.charAt(0).toUpperCase() + s.severity.slice(1).toLowerCase()
-            : undefined,
-        }));
-        setHistory(normalized);
+      if (!currentUser) {
+        console.log("No user logged in");
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      console.error("[MedicalHistory] Unexpected fetch error:", err);
-      setLoadError(err.message || "Unknown error");
-      toastRef.current.error("Unexpected error loading history.");
-    } finally {
-      // ✅ ALWAYS reset loading — prevents the stuck spinner
-      setLoading(false);
-    }
-  }, [user?.uid, retryKey]); // ← toast intentionally omitted; use toastRef
 
-  useEffect(() => {
-    load();
-  }, [load]);
+      try {
+        const { symptoms, error } = await getSymptomsDoc(currentUser.uid);
+        console.log("FETCHED:", symptoms);
+
+        if (error) {
+          setLoadError(error);
+          toastRef.current.error("Could not load medical history.");
+        } else {
+          // Sort latest first in JS — no Firestore index required
+          const sorted = (symptoms || []).slice().sort((a, b) => {
+            const aTs = a.timestamp ? new Date(a.timestamp).getTime() : (a.createdAt?.seconds ?? 0) * 1000;
+            const bTs = b.timestamp ? new Date(b.timestamp).getTime() : (b.createdAt?.seconds ?? 0) * 1000;
+            return bTs - aTs;
+          });
+
+          const normalized = sorted.map((s) => ({
+            ...s,
+            diagnosis: toTitleCase(s.diagnosis),
+            severity: s.severity
+              ? s.severity.charAt(0).toUpperCase() + s.severity.slice(1).toLowerCase()
+              : undefined,
+          }));
+          setHistory(normalized);
+        }
+      } catch (err) {
+        console.error("[MedicalHistory] Fetch error:", err);
+        setLoadError(err.message || "Unknown error");
+        toastRef.current.error("Unexpected error loading history.");
+      } finally {
+        setLoading(false); // ALWAYS stops the spinner
+      }
+    });
+
+    // Unsubscribe auth listener on unmount or retryKey change
+    return () => unsubscribe();
+  }, [retryKey]);
 
   // ── Filter + derived ───────────────────────────────────────
   const SEVERITIES = ["All", "Low", "Medium", "High", "Critical"];
@@ -294,8 +282,8 @@ const MedicalHistory = () => {
                 key={s}
                 onClick={() => setFilterSev(s)}
                 className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${filterSev === s
-                    ? "bg-primary text-white border-primary"
-                    : "bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40"
+                  ? "bg-primary text-white border-primary"
+                  : "bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40"
                   }`}
               >
                 {s}
