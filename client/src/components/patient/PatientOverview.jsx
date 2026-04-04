@@ -53,7 +53,7 @@ const getUrgencyMessage = (symptoms) => {
     title: "Consult a Doctor Soon",
     body: `Your recent ${latest.diagnosis} assessment shows High severity. Schedule an appointment with your doctor within the next 24–48 hours.`,
   };
-  const recentHigh = symptoms.slice(0, 5).filter((s) => ["High","Critical"].includes(s.severity));
+  const recentHigh = symptoms.slice(0, 5).filter((s) => ["High", "Critical"].includes(s.severity));
   if (recentHigh.length >= 2) return {
     icon: "⚠️", color: "bg-amber-50 border-amber-200 text-amber-800",
     title: "Pattern Detected",
@@ -70,33 +70,41 @@ const buildInsights = (symptoms) => {
   const symWords = {};
   symptoms.forEach((s) => {
     diagCounts[s.diagnosis] = (diagCounts[s.diagnosis] || 0) + 1;
-    (s.symptoms || "").toLowerCase().split(/,\s*/).forEach((w) => {
+    (Array.isArray(s.symptoms) ? s.symptoms.join(" ") : s.symptoms || "").toLowerCase().split(/,\s*/).forEach((w) => {
       if (w.trim().length > 2) symWords[w.trim()] = (symWords[w.trim()] || 0) + 1;
     });
   });
   const topDiag = Object.entries(diagCounts).sort((a, b) => b[1] - a[1])[0];
   if (topDiag?.[1] >= 2)
-    insights.push({ icon: "📊", color: "bg-blue-50 border-blue-200 text-blue-800",
+    insights.push({
+      icon: "📊", color: "bg-blue-50 border-blue-200 text-blue-800",
       message: `"${topDiag[0]}" has appeared ${topDiag[1]} times in your history.`,
-      action: "Consider a follow-up consultation with your doctor." });
+      action: "Consider a follow-up consultation with your doctor."
+    });
   const topSym = Object.entries(symWords).sort((a, b) => b[1] - a[1])[0];
   if (topSym?.[1] >= 2)
-    insights.push({ icon: "🔁", color: "bg-amber-50 border-amber-200 text-amber-800",
+    insights.push({
+      icon: "🔁", color: "bg-amber-50 border-amber-200 text-amber-800",
       message: `"${topSym[0]}" appears frequently in your reports.`,
-      action: "Recurring symptoms may indicate an underlying condition." });
-  const highSev = symptoms.filter((s) => ["High","Critical"].includes(s.severity));
+      action: "Recurring symptoms may indicate an underlying condition."
+    });
+  const highSev = symptoms.filter((s) => ["High", "Critical"].includes(s.severity));
   if (highSev.length)
-    insights.push({ icon: "🚨", color: "bg-red-50 border-red-200 text-red-800",
+    insights.push({
+      icon: "🚨", color: "bg-red-50 border-red-200 text-red-800",
       message: "You've had high-severity symptom assessments recently.",
-      action: "Please schedule an in-person consultation with a doctor." });
+      action: "Please schedule an in-person consultation with a doctor."
+    });
   const recentWeek = symptoms.filter((s) => {
     const d = new Date(s.timestamp || s.date);
     return !isNaN(d) && Date.now() - d.getTime() < 7 * 24 * 60 * 60 * 1000;
   });
   if (!recentWeek.length && symptoms.length > 0)
-    insights.push({ icon: "💚", color: "bg-green-50 border-green-200 text-green-800",
+    insights.push({
+      icon: "💚", color: "bg-green-50 border-green-200 text-green-800",
       message: "No new symptoms reported this week — great sign!",
-      action: "Keep up your healthy routine." });
+      action: "Keep up your healthy routine."
+    });
   return insights.slice(0, 3);
 };
 
@@ -128,12 +136,12 @@ const PatientOverview = ({ user, setActiveSection }) => {
   toastRef.current = toast;
 
   const [symptoms, setSymptoms] = useState([]);
-  const [reports,  setReports]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const hour     = new Date().getHours();
+  const hour = new Date().getHours();
   const greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
-  const tip      = DAILY_TIPS[new Date().getDate() % DAILY_TIPS.length];
+  const tip = DAILY_TIPS[new Date().getDate() % DAILY_TIPS.length];
 
   const load = useCallback(async () => {
     if (!authUser?.uid) return;
@@ -152,7 +160,7 @@ const PatientOverview = ({ user, setActiveSection }) => {
     } finally {
       setLoading(false);
     }
-  // toast intentionally omitted — use toastRef
+    // toast intentionally omitted — use toastRef
   }, [authUser?.uid]);
 
   useEffect(() => {
@@ -160,22 +168,22 @@ const PatientOverview = ({ user, setActiveSection }) => {
     analytics.page("overview");
   }, [load]);
 
-  const insights   = useMemo(() => buildInsights(symptoms), [symptoms]);
-  const trendData  = useMemo(() => buildTrendData(symptoms), [symptoms]);
-  const urgency    = useMemo(() => getUrgencyMessage(symptoms), [symptoms]);
+  const insights = useMemo(() => buildInsights(symptoms), [symptoms]);
+  const trendData = useMemo(() => buildTrendData(symptoms), [symptoms]);
+  const urgency = useMemo(() => getUrgencyMessage(symptoms), [symptoms]);
 
   const STATS = [
-    { icon: "🧠", label: "AI Assessments", value: symptoms.length, color: "bg-blue-50",   sub: "Total"    },
-    { icon: "📁", label: "Reports",         value: reports.length,  color: "bg-purple-50", sub: "Uploaded" },
-    { icon: "💡", label: "AI Insights",     value: insights.length, color: "bg-green-50",  sub: "Active"   },
-    { icon: "🔔", label: "Alerts",          value: "Active",        color: "bg-amber-50",  sub: "Check alerts" },
+    { icon: "🧠", label: "AI Assessments", value: symptoms.length, color: "bg-blue-50", sub: "Total" },
+    { icon: "📁", label: "Reports", value: reports.length, color: "bg-purple-50", sub: "Uploaded" },
+    { icon: "💡", label: "AI Insights", value: insights.length, color: "bg-green-50", sub: "Active" },
+    { icon: "🔔", label: "Alerts", value: "Active", color: "bg-amber-50", sub: "Check alerts" },
   ];
 
   const QUICK = [
-    { label: "AI Symptom Check", icon: "🧠", section: "symptoms",     color: "bg-blue-50 text-blue-600 hover:bg-blue-100"    },
-    { label: "Medical History",  icon: "📋", section: "history",      color: "bg-green-50 text-green-600 hover:bg-green-100"  },
-    { label: "Appointments",     icon: "📅", section: "appointments", color: "bg-purple-50 text-purple-600 hover:bg-purple-100" },
-    { label: "Upload Report",    icon: "📁", section: "reports",      color: "bg-amber-50 text-amber-600 hover:bg-amber-100"   },
+    { label: "AI Symptom Check", icon: "🧠", section: "symptoms", color: "bg-blue-50 text-blue-600 hover:bg-blue-100" },
+    { label: "Medical History", icon: "📋", section: "history", color: "bg-green-50 text-green-600 hover:bg-green-100" },
+    { label: "Appointments", icon: "📅", section: "appointments", color: "bg-purple-50 text-purple-600 hover:bg-purple-100" },
+    { label: "Upload Report", icon: "📁", section: "reports", color: "bg-amber-50 text-amber-600 hover:bg-amber-100" },
   ];
 
   const SEV_YAXIS = { 0: "—", 1: "Low", 2: "Med", 3: "High", 4: "Crit" };
@@ -211,7 +219,7 @@ const PatientOverview = ({ user, setActiveSection }) => {
       {/* Stats */}
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0,1,2,3].map((i) => <StatCardSkeleton key={i} />)}
+          {[0, 1, 2, 3].map((i) => <StatCardSkeleton key={i} />)}
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -254,8 +262,8 @@ const PatientOverview = ({ user, setActiveSection }) => {
             <AreaChart data={trendData}>
               <defs>
                 <linearGradient id="sevGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#2E86DE" stopOpacity={0.2} />
-                  <stop offset="95%" stopColor="#2E86DE" stopOpacity={0}   />
+                  <stop offset="5%" stopColor="#2E86DE" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#2E86DE" stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -329,11 +337,10 @@ const PatientOverview = ({ user, setActiveSection }) => {
                   <p className="text-xs text-gray-400">{s.date} · {s.confidence}% confidence</p>
                 </div>
                 {s.severity && (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                    s.severity === "High" || s.severity === "Critical" ? "bg-red-50 text-red-600"
-                    : s.severity === "Medium" ? "bg-amber-50 text-amber-600"
-                    : "bg-green-50 text-green-600"
-                  }`}>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${s.severity === "High" || s.severity === "Critical" ? "bg-red-50 text-red-600"
+                      : s.severity === "Medium" ? "bg-amber-50 text-amber-600"
+                        : "bg-green-50 text-green-600"
+                    }`}>
                     {s.severity}
                   </span>
                 )}
