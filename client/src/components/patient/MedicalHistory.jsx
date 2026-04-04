@@ -195,6 +195,9 @@ const MedicalHistory = () => {
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
+  // Holds the active Firestore unsubscribe fn — guards against duplicate listeners
+  const unsubscribeRef = useRef(null);
+
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -223,7 +226,6 @@ const MedicalHistory = () => {
     if (userId === undefined) return; // auth still loading — do nothing
 
     if (userId === null) {
-      // No user — stop loading and clear history
       setLoading(false);
       setHistory([]);
       return;
@@ -232,8 +234,13 @@ const MedicalHistory = () => {
     setLoading(true);
     setLoadError(null);
 
-    // subscribeToMedicalHistory returns a clean mapped array — no { symptoms, error } wrapper.
-    // All field normalization (disease→diagnosis, severity casing, selectedTags) done in firestore.js.
+    // 🛑 Kill any existing listener BEFORE creating a new one
+    if (unsubscribeRef.current) {
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+
+    // ✅ Single listener, stored in ref so it can be cancelled deterministically
     const unsub = subscribeToMedicalHistory(userId, (data) => {
       console.log("FETCHED:", data);
       setHistory(
@@ -242,7 +249,14 @@ const MedicalHistory = () => {
       setLoading(false); // ALWAYS stops the spinner
     });
 
-    return () => unsub(); // clean up Firestore listener on every re-run
+    unsubscribeRef.current = unsub;
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
+    };
   }, [userId, retryKey]); // ← only re-runs when user changes or retry is clicked
 
 
