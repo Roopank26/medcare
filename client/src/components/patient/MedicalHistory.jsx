@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { subscribeToSymptoms } from "../../firebase/firestore";
+import { subscribeToMedicalHistory } from "../../firebase/firestore";
 import { PageSpinner, EmptyState, ConfidenceBar, MedicalDisclaimer } from "../shared/UI";
 import useToast from "../../hooks/useToast";
 
@@ -202,63 +202,50 @@ const MedicalHistory = () => {
   const [filterSev, setFilterSev] = useState("All");
   const [retryKey, setRetryKey] = useState(0);
 
-  // ── Real-time listener — auth-aware, cleans up on unmount ──
+  // ── Effect 1: track auth state — runs ONCE on mount ──────────
+  // Stores uid in state; onSnapshot is NOT created here so token
+  // refreshes do NOT recreate the Firestore listener.
+  const [userId, setUserId] = useState(undefined); // undefined = "not yet resolved"
+
   useEffect(() => {
+    const unsub = onAuthStateChanged(getAuth(), (currentUser) => {
+      console.log("USER:", currentUser);
+      setUserId(currentUser ? currentUser.uid : null);
+    });
+    return () => unsub();
+  }, []); // ← empty: auth listener lives for the full component lifetime
+
+  // ── Effect 2: Firestore listener — re-runs only when uid or retryKey changes ──
+  // userId === undefined  → auth not yet resolved (keep loading)
+  // userId === null       → no user logged in (stop loading)
+  // userId === "abc123"   → subscribe to real-time data
+  useEffect(() => {
+    if (userId === undefined) return; // auth still loading — do nothing
+
+    if (userId === null) {
+      // No user — stop loading and clear history
+      setLoading(false);
+      setHistory([]);
+      return;
+    }
+
     setLoading(true);
     setLoadError(null);
 
-    let firestoreUnsub = null;
-
-    const authUnsub = onAuthStateChanged(getAuth(), (currentUser) => {
-      console.log("USER:", currentUser);
-
-      // Tear down any previous Firestore listener when auth state changes
-      if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
-
-      if (!currentUser) {
-        console.log("No user logged in");
-        setLoading(false);
-        setHistory([]);
-        return;
-      }
-
-      // Real-time subscription — no orderBy, no index required
-      firestoreUnsub = subscribeToSymptoms(currentUser.uid, ({ symptoms, error }) => {
-        console.log("FETCHED:", symptoms);
-
-        if (error) {
-          setLoadError(error);
-          toastRef.current.error("Could not load medical history.");
-        } else {
-          // Sort latest first in JS
-          const sorted = (symptoms || []).slice().sort((a, b) => {
-            const aTs = a.timestamp ? new Date(a.timestamp).getTime() : (a.createdAt?.seconds ?? 0) * 1000;
-            const bTs = b.timestamp ? new Date(b.timestamp).getTime() : (b.createdAt?.seconds ?? 0) * 1000;
-            return bTs - aTs;
-          });
-
-          const normalized = sorted.map((s) => ({
-            ...s,
-            diagnosis: toTitleCase(s.diagnosis || s.disease || ""),
-            severity: s.severity
-              ? s.severity.charAt(0).toUpperCase() + s.severity.slice(1).toLowerCase()
-              : undefined,
-            selectedTags: Array.isArray(s.selectedTags)
-              ? s.selectedTags
-              : Array.isArray(s.symptoms) ? s.symptoms : [],
-          }));
-          setHistory(normalized);
-        }
-        setLoading(false); // ALWAYS stops the spinner
-      });
+    // subscribeToMedicalHistory returns a clean mapped array — no { symptoms, error } wrapper.
+    // All field normalization (disease→diagnosis, severity casing, selectedTags) done in firestore.js.
+    const unsub = subscribeToMedicalHistory(userId, (data) => {
+      console.log("FETCHED:", data);
+      setHistory(
+        data.map((s) => ({ ...s, diagnosis: toTitleCase(s.diagnosis) }))
+      );
+      setLoading(false); // ALWAYS stops the spinner
     });
 
-    // Cleanup both listeners on unmount or retryKey change
-    return () => {
-      authUnsub();
-      if (firestoreUnsub) firestoreUnsub();
-    };
-  }, [retryKey]);
+    return () => unsub(); // clean up Firestore listener on every re-run
+  }, [userId, retryKey]); // ← only re-runs when user changes or retry is clicked
+
+
 
   // ── Filter + derived ───────────────────────────────────────
   const SEVERITIES = ["All", "Low", "Medium", "High", "Critical"];

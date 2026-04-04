@@ -310,6 +310,49 @@ export const subscribeToSymptoms = (userId, callback) => {
   return unsub;
 };
 
+/**
+ * Named alias for MedicalHistory.jsx — calls callback(mappedArray) directly.
+ * Normalization (disease→diagnosis, symptoms→selectedTags) done here so
+ * components receive clean, type-safe data and need zero extra processing.
+ */
+export const subscribeToMedicalHistory = (userId, callback) => {
+  const col = collection(db, "medical_history");
+  const q = query(col, where("userId", "==", userId));
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const raw = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      raw.sort((a, b) => {
+        const aTs = a.timestamp?.seconds ?? 0;
+        const bTs = b.timestamp?.seconds ?? 0;
+        return bTs - aTs;
+      });
+
+      const mapped = raw.map((d) => ({
+        ...d,
+        // Normalize Firestore field names → UI names
+        diagnosis: d.disease || d.diagnosis || "",
+        selectedTags: Array.isArray(d.symptoms) ? d.symptoms : [],
+        createdAt: d.timestamp || null,
+        timestamp: toISO(d.timestamp) || d.date || null,
+        // Ensure numeric confidence and safe severity
+        confidence: Number(d.confidence) || 0,
+        severity: d.severity
+          ? d.severity.charAt(0).toUpperCase() + d.severity.slice(1).toLowerCase()
+          : undefined,
+      }));
+
+      callback(mapped);
+    },
+    (err) => {
+      console.error("[Firestore] subscribeToMedicalHistory error:", err.message);
+      callback([]); // safe empty array on error
+    }
+  );
+};
+
 // ═════════════════════════════════════════════════════════════
 //  REPORTS
 // ═════════════════════════════════════════════════════════════
