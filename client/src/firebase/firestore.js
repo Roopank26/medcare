@@ -88,9 +88,9 @@ export const createUserProfile = async (uid, data) => {
   try {
     await setDoc(doc(db, "users", uid), {
       uid,
-      name:      data.name?.trim()  || "",
-      email:     data.email?.trim().toLowerCase() || "",
-      role:      data.role          || "patient",
+      name: data.name?.trim() || "",
+      email: data.email?.trim().toLowerCase() || "",
+      role: data.role || "patient",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -107,9 +107,9 @@ export const getUserProfile = async (uid) => {
     console.log('[Firestore] Fetching user profile for UID:', uid);
     const docRef = doc(db, "users", uid);
     console.log('[Firestore] Document reference path:', docRef.path);
-    
+
     const snap = await getDoc(docRef);
-    
+
     if (snap.exists()) {
       const data = snap.data();
       console.log('[Firestore] ✅ Document found, data:', data);
@@ -157,7 +157,7 @@ export const addPatientDoc = async (data) => {
   try {
     const ref = await addDoc(collection(db, "patients"), {
       ...data,
-      doctorId:  data.doctorId,
+      doctorId: data.doctorId,
       lastVisit: new Date().toISOString().split("T")[0],
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -173,10 +173,10 @@ export const addPatientDoc = async (data) => {
 export const getPatientsDoc = async (doctorId = null) => {
   try {
     const col = collection(db, "patients");
-    const q   = doctorId
+    const q = doctorId
       ? query(col, where("doctorId", "==", doctorId), orderBy("createdAt", "desc"))
       : query(col, orderBy("createdAt", "desc"));
-    const fb  = doctorId ? query(col, where("doctorId", "==", doctorId)) : col;
+    const fb = doctorId ? query(col, where("doctorId", "==", doctorId)) : col;
     const patients = await safeDocs(q, fb);
     return { patients, error: null };
   } catch (err) {
@@ -190,10 +190,10 @@ export const getPatientsDoc = async (doctorId = null) => {
  */
 export const subscribeToPatients = (doctorId, callback) => {
   const col = collection(db, "patients");
-  const q   = doctorId
+  const q = doctorId
     ? query(col, where("doctorId", "==", doctorId), orderBy("createdAt", "desc"))
     : query(col, orderBy("createdAt", "desc"));
-  const fb  = doctorId ? query(col, where("doctorId", "==", doctorId)) : col;
+  const fb = doctorId ? query(col, where("doctorId", "==", doctorId)) : col;
 
   return safeSnapshot(q, fb, ({ docs, error }) => {
     callback({ patients: docs, error });
@@ -239,41 +239,75 @@ export const saveSymptomDoc = async (userId, data) => {
   }
 };
 
-/** One-shot symptom history fetch. */
+/** One-shot medical history fetch. No orderBy → no composite index required. Sorted in JS. */
 export const getSymptomsDoc = async (userId) => {
   try {
-    const col = collection(db, "symptoms");
-    const raw = await safeDocs(
-      query(col, where("userId", "==", userId), orderBy("createdAt", "desc")),
-      query(col, where("userId", "==", userId))
-    );
+    console.log("UID:", userId);
+    const col = collection(db, "medical_history");
+    // Plain where-only query — no composite index required
+    const snap = await getDocs(query(col, where("userId", "==", userId)));
+    console.log("Docs:", snap.docs.length);
+
+    const raw = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Sort latest first in JS
+    raw.sort((a, b) => {
+      const aTs = a.timestamp?.seconds ?? 0;
+      const bTs = b.timestamp?.seconds ?? 0;
+      return bTs - aTs;
+    });
+
     return {
       symptoms: raw.map((d) => ({
         ...d,
-        timestamp: toISO(d.createdAt) || d.timestamp || d.date,
+        // Map Firestore field names → UI expected names
+        diagnosis: d.disease,
+        selectedTags: Array.isArray(d.symptoms) ? d.symptoms : [],
+        createdAt: d.timestamp,
+        timestamp: toISO(d.timestamp) || d.date,
       })),
       error: null,
     };
   } catch (err) {
+    console.error("[Firestore] getSymptomsDoc error:", err.message);
     return { symptoms: [], error: err.message };
   }
 };
 
-/** Real-time symptom history listener. */
+/** Real-time medical history listener. No orderBy → no composite index required. Sorted in JS. */
 export const subscribeToSymptoms = (userId, callback) => {
-  const col = collection(db, "symptoms");
-  const q   = query(col, where("userId", "==", userId), orderBy("createdAt", "desc"));
-  const fb  = query(col, where("userId", "==", userId));
+  const col = collection(db, "medical_history");
+  // Plain where-only query — no index needed
+  const q = query(col, where("userId", "==", userId));
 
-  return safeSnapshot(q, fb, ({ docs, error }) => {
-    callback({
-      symptoms: docs.map((d) => ({
-        ...d,
-        timestamp: toISO(d.createdAt) || d.date,
-      })),
-      error,
-    });
-  });
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      // Sort latest first in JS
+      docs.sort((a, b) => {
+        const aTs = a.timestamp?.seconds ?? 0;
+        const bTs = b.timestamp?.seconds ?? 0;
+        return bTs - aTs;
+      });
+      callback({
+        symptoms: docs.map((d) => ({
+          ...d,
+          diagnosis: d.disease,
+          selectedTags: Array.isArray(d.symptoms) ? d.symptoms : [],
+          createdAt: d.timestamp,
+          timestamp: toISO(d.timestamp) || d.date,
+        })),
+        error: null,
+      });
+    },
+    (err) => {
+      console.error("[Firestore] subscribeToSymptoms error:", err.message);
+      callback({ symptoms: [], error: err.message });
+    }
+  );
+
+  return unsub;
 };
 
 // ═════════════════════════════════════════════════════════════
@@ -347,10 +381,10 @@ export const saveAppointmentDoc = async (data) => {
  * Doctors: where doctorId == uid
  */
 export const subscribeToAppointments = (userId, isDoctor, callback) => {
-  const col   = collection(db, "appointments");
+  const col = collection(db, "appointments");
   const field = isDoctor ? "doctorId" : "userId";
-  const q     = query(col, where(field, "==", userId), orderBy("date", "asc"));
-  const fb    = query(col, where(field, "==", userId));
+  const q = query(col, where(field, "==", userId), orderBy("date", "asc"));
+  const fb = query(col, where(field, "==", userId));
 
   return safeSnapshot(q, fb, ({ docs, error }) => {
     callback({ appointments: docs, error });
@@ -385,10 +419,10 @@ export const saveChatFeedback = async (userId, feedbackData) => {
     const ref = await addDoc(collection(db, 'chatFeedback'), {
       userId,
       messageId: feedbackData.messageId || null,
-      content:   feedbackData.content   || '',
-      helpful:   feedbackData.helpful,          // boolean
-      ts:        feedbackData.ts || new Date().toISOString(),
-      savedAt:   serverTimestamp(),
+      content: feedbackData.content || '',
+      helpful: feedbackData.helpful,          // boolean
+      ts: feedbackData.ts || new Date().toISOString(),
+      savedAt: serverTimestamp(),
     });
     return { id: ref.id, error: null };
   } catch (err) {
@@ -425,13 +459,13 @@ export const savePredictionFeedback = async (userId, feedbackData) => {
   try {
     const ref = await addDoc(collection(db, 'predictionFeedback'), {
       userId,
-      symptoms:   feedbackData.symptoms   || '',
-      disease:    feedbackData.disease    || '',
+      symptoms: feedbackData.symptoms || '',
+      disease: feedbackData.disease || '',
       confidence: feedbackData.confidence || 0,
-      helpful:    feedbackData.helpful,           // boolean
-      comment:    feedbackData.comment    || '',  // optional text correction
-      ts:         feedbackData.ts || new Date().toISOString(),
-      savedAt:    serverTimestamp(),
+      helpful: feedbackData.helpful,           // boolean
+      comment: feedbackData.comment || '',  // optional text correction
+      ts: feedbackData.ts || new Date().toISOString(),
+      savedAt: serverTimestamp(),
     });
     return { id: ref.id, error: null };
   } catch (err) {

@@ -30,11 +30,11 @@ const toTitleCase = (str) => {
 };
 
 const SEV_STYLE = {
-  Low:      "bg-green-50 text-green-700 border-green-200",
-  Medium:   "bg-amber-50 text-amber-700 border-amber-200",
-  High:     "bg-red-50 text-red-700 border-red-200",
+  Low: "bg-green-50 text-green-700 border-green-200",
+  Medium: "bg-amber-50 text-amber-700 border-amber-200",
+  High: "bg-red-50 text-red-700 border-red-200",
   Critical: "bg-red-100 text-red-900 border-red-400",
-  Unknown:  "bg-gray-50 text-gray-600 border-gray-200",
+  Unknown: "bg-gray-50 text-gray-600 border-gray-200",
 };
 
 const formatDate = (ts) => {
@@ -197,12 +197,12 @@ const MedicalHistory = () => {
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
-  const [history,   setHistory]   = useState([]);
-  const [loading,   setLoading]   = useState(true);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  const [selected,  setSelected]  = useState(null);
+  const [selected, setSelected] = useState(null);
   const [filterSev, setFilterSev] = useState("All");
-  const [retryKey,  setRetryKey]  = useState(0);
+  const [retryKey, setRetryKey] = useState(0);
 
   // ── Fetch ──────────────────────────────────────────────────
   // IMPORTANT: `toast` is intentionally excluded from deps — use toastRef instead.
@@ -215,23 +215,34 @@ const MedicalHistory = () => {
       return;
     }
 
-    console.log("[MedicalHistory] Fetching history for UID:", user.uid);
+    console.log("UID:", user.uid);
     setLoading(true);
     setLoadError(null);
 
     try {
       const { symptoms, error } = await getSymptomsDoc(user.uid);
-      console.log("[MedicalHistory] Docs found:", symptoms?.length ?? 0, "Error:", error);
+      console.log("Docs:", symptoms?.length ?? 0);
 
       if (error) {
         setLoadError(error);
         toastRef.current.error("Could not load medical history.");
       } else {
-        // Normalize and deduplicate each record's disease name
-        const normalized = (symptoms || []).map((s) => ({
+        // Belt-and-suspenders JS sort (latest first) — no Firestore index needed
+        const sorted = (symptoms || []).slice().sort((a, b) => {
+          const aTs = a.timestamp
+            ? new Date(a.timestamp).getTime()
+            : (a.createdAt?.seconds ?? 0) * 1000;
+          const bTs = b.timestamp
+            ? new Date(b.timestamp).getTime()
+            : (b.createdAt?.seconds ?? 0) * 1000;
+          return bTs - aTs;
+        });
+
+        // Normalize disease names and severity casing
+        const normalized = sorted.map((s) => ({
           ...s,
           diagnosis: toTitleCase(s.diagnosis),
-          severity:  s.severity
+          severity: s.severity
             ? s.severity.charAt(0).toUpperCase() + s.severity.slice(1).toLowerCase()
             : undefined,
         }));
@@ -242,7 +253,7 @@ const MedicalHistory = () => {
       setLoadError(err.message || "Unknown error");
       toastRef.current.error("Unexpected error loading history.");
     } finally {
-      // ✅ ALWAYS reset loading — this is the fix for the stuck spinner
+      // ✅ ALWAYS reset loading — prevents the stuck spinner
       setLoading(false);
     }
   }, [user?.uid, retryKey]); // ← toast intentionally omitted; use toastRef
@@ -261,8 +272,8 @@ const MedicalHistory = () => {
 
   const confBadge = (c) =>
     c >= 70 ? "bg-red-50 text-red-600"
-  : c >= 50 ? "bg-amber-50 text-amber-600"
-  : "bg-green-50 text-green-600";
+      : c >= 50 ? "bg-amber-50 text-amber-600"
+        : "bg-green-50 text-green-600";
 
   // ── Render ─────────────────────────────────────────────────
   return (
@@ -282,11 +293,10 @@ const MedicalHistory = () => {
               <button
                 key={s}
                 onClick={() => setFilterSev(s)}
-                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${
-                  filterSev === s
+                className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${filterSev === s
                     ? "bg-primary text-white border-primary"
                     : "bg-gray-50 text-gray-600 border-gray-200 hover:border-primary/40"
-                }`}
+                  }`}
               >
                 {s}
               </button>
@@ -298,7 +308,7 @@ const MedicalHistory = () => {
         {loading ? (
           <PageSpinner message="Loading medical history…" />
 
-        /* Error */
+          /* Error */
         ) : loadError ? (
           <div className="text-center py-14 px-4">
             <div className="text-5xl mb-4">⚠️</div>
@@ -312,7 +322,7 @@ const MedicalHistory = () => {
             </button>
           </div>
 
-        /* Empty */
+          /* Empty */
         ) : shown.length === 0 ? (
           <EmptyState
             icon={filterSev !== "All" ? "🔍" : "📭"}
@@ -329,7 +339,7 @@ const MedicalHistory = () => {
             ) : null}
           />
 
-        /* Table */
+          /* Table */
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -379,9 +389,8 @@ const MedicalHistory = () => {
                       <td className="py-3.5 pr-4">
                         {item.severity ? (
                           <span
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
-                              SEV_STYLE[item.severity] || SEV_STYLE.Unknown
-                            }`}
+                            className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SEV_STYLE[item.severity] || SEV_STYLE.Unknown
+                              }`}
                           >
                             {item.severity}
                           </span>
