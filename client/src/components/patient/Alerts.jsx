@@ -11,37 +11,37 @@ import { PageSpinner } from "../shared/UI";
 const ALERT_CFG = {
   critical: {
     border: "bg-red-50 border-red-200 text-red-800",
-    badge:  "bg-red-100 text-red-700",
+    badge: "bg-red-100 text-red-700",
   },
   warning: {
     border: "bg-amber-50 border-amber-200 text-amber-800",
-    badge:  "bg-amber-100 text-amber-700",
+    badge: "bg-amber-100 text-amber-700",
   },
   info: {
     border: "bg-blue-50 border-blue-200 text-blue-800",
-    badge:  "bg-blue-100 text-blue-700",
+    badge: "bg-blue-100 text-blue-700",
   },
   success: {
     border: "bg-green-50 border-green-200 text-green-800",
-    badge:  "bg-green-100 text-green-700",
+    badge: "bg-green-100 text-green-700",
   },
 };
 
 function buildAlerts(symptoms, reports) {
   const alerts = [];
-  const today  = new Date().toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
 
   // Critical / High severity from latest symptom
   if (symptoms.length > 0) {
     const latest = symptoms[0];
     if (latest.severity === "Critical" || latest.severity === "High") {
       alerts.push({
-        id:      "sev-latest",
-        type:    "critical",
-        icon:    "🚨",
+        id: "sev-latest",
+        type: "critical",
+        icon: "🚨",
         message: `Your most recent assessment (${latest.diagnosis}) was rated ${latest.severity} severity.`,
-        sub:     "Please consult a qualified healthcare professional immediately.",
-        date:    latest.date || today,
+        sub: "Please consult a qualified healthcare professional immediately.",
+        date: latest.date || today,
       });
     }
 
@@ -53,34 +53,38 @@ function buildAlerts(symptoms, reports) {
     const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
     if (top && top[1] >= 2) {
       alerts.push({
-        id:      "recur",
-        type:    "warning",
-        icon:    "🔁",
+        id: "recur",
+        type: "warning",
+        icon: "🔁",
         message: `"${top[0]}" has appeared ${top[1]} times in your health records.`,
-        sub:     "Recurring issues may indicate an underlying condition.",
-        date:    today,
+        sub: "Recurring issues may indicate an underlying condition.",
+        date: today,
       });
     }
 
     // Most frequent symptom word
     const words = {};
-    symptoms.forEach((s) =>
-      (s.symptoms || "")
+    symptoms.forEach((s) => {
+      // Safe: symptoms can be array, string, or null
+      const raw = Array.isArray(s.symptoms)
+        ? s.symptoms.join(" ")
+        : (s.symptoms || "");
+      raw
         .toLowerCase()
         .split(/,\s*/)
         .forEach((w) => {
           if (w.trim().length > 2) words[w.trim()] = (words[w.trim()] || 0) + 1;
-        })
-    );
+        });
+    });
     const topWord = Object.entries(words).sort((a, b) => b[1] - a[1])[0];
     if (topWord && topWord[1] >= 2) {
       alerts.push({
-        id:      "freq-sym",
-        type:    "info",
-        icon:    "📊",
+        id: "freq-sym",
+        type: "info",
+        icon: "📊",
         message: `"${topWord[0]}" is your most frequently reported symptom (${topWord[1]}×).`,
-        sub:     "Tracking patterns helps your doctor provide better care.",
-        date:    today,
+        sub: "Tracking patterns helps your doctor provide better care.",
+        date: today,
       });
     }
   }
@@ -89,32 +93,32 @@ function buildAlerts(symptoms, reports) {
   if (reports.length > 0) {
     const latest = reports[0];
     alerts.push({
-      id:      "report-latest",
-      type:    "info",
-      icon:    "📄",
+      id: "report-latest",
+      type: "info",
+      icon: "📄",
       message: `Report "${latest.filename}" was uploaded successfully.`,
-      sub:     "Your doctor can now review this file.",
-      date:    (latest.uploadedAt || "").split("T")[0] || today,
+      sub: "Your doctor can now review this file.",
+      date: (latest.uploadedAt || "").split("T")[0] || today,
     });
   }
 
   // Static wellness alerts
   alerts.push(
     {
-      id:      "checkup",
-      type:    "info",
-      icon:    "📅",
+      id: "checkup",
+      type: "info",
+      icon: "📅",
       message: "Schedule a routine health check-up.",
-      sub:     "Preventive care catches issues early — recommended every 6–12 months.",
-      date:    today,
+      sub: "Preventive care catches issues early — recommended every 6–12 months.",
+      date: today,
     },
     {
-      id:      "wellness",
-      type:    "success",
-      icon:    "💚",
+      id: "wellness",
+      type: "success",
+      icon: "💚",
       message: "Tip: Stay hydrated, sleep 7–9 hours, move for 30 min daily.",
-      sub:     "Consistent habits prevent over 80% of chronic diseases.",
-      date:    today,
+      sub: "Consistent habits prevent over 80% of chronic diseases.",
+      date: today,
     }
   );
 
@@ -150,14 +154,18 @@ const AlertCard = ({ alert, onDismiss }) => {
 };
 
 const Alerts = () => {
-  const { user }   = useAuth();
-  const [allAlerts,  setAllAlerts]  = useState([]);
-  const [dismissed,  setDismissed]  = useState([]);
-  const [loading,    setLoading]    = useState(true);
+  const { user } = useAuth();
+  const [allAlerts, setAllAlerts] = useState([]);
+  const [dismissed, setDismissed] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("All");
 
   useEffect(() => {
-    if (!user?.uid) return;
+    // Guard: if no user, stop loading immediately
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
 
     let reports = [];
     let symptoms = [];
@@ -187,7 +195,7 @@ const Alerts = () => {
     return () => unsub(); // cleanup symptom listener
   }, [user?.uid]);
 
-  const dismiss    = (id) => setDismissed((prev) => [...prev, id]);
+  const dismiss = (id) => setDismissed((prev) => [...prev, id]);
   const restoreAll = () => setDismissed([]);
 
   const visible = allAlerts
@@ -200,10 +208,10 @@ const Alerts = () => {
     .forEach((a) => { if (counts[a.type] !== undefined) counts[a.type]++; });
 
   const TYPES = [
-    { key: "critical", label: "Critical", icon: "🚨", color: "bg-red-50 text-red-600"      },
-    { key: "warning",  label: "Warnings", icon: "⚠️", color: "bg-amber-50 text-amber-600"  },
-    { key: "info",     label: "Info",     icon: "ℹ️", color: "bg-blue-50 text-blue-600"    },
-    { key: "success",  label: "Tips",     icon: "💚", color: "bg-green-50 text-green-600"  },
+    { key: "critical", label: "Critical", icon: "🚨", color: "bg-red-50 text-red-600" },
+    { key: "warning", label: "Warnings", icon: "⚠️", color: "bg-amber-50 text-amber-600" },
+    { key: "info", label: "Info", icon: "ℹ️", color: "bg-blue-50 text-blue-600" },
+    { key: "success", label: "Tips", icon: "💚", color: "bg-green-50 text-green-600" },
   ];
 
   return (
@@ -214,9 +222,8 @@ const Alerts = () => {
           <button
             key={t.key}
             onClick={() => setFilterType(filterType === t.key ? "All" : t.key)}
-            className={`card text-left hover:-translate-y-0.5 transition-all cursor-pointer ${
-              filterType === t.key ? "ring-2 ring-primary" : ""
-            }`}
+            className={`card text-left hover:-translate-y-0.5 transition-all cursor-pointer ${filterType === t.key ? "ring-2 ring-primary" : ""
+              }`}
           >
             <div className={`w-10 h-10 ${t.color} rounded-xl flex items-center justify-center text-xl mb-2`}>
               {t.icon}

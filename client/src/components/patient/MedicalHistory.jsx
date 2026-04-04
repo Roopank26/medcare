@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getSymptomsDoc } from "../../firebase/firestore";
+import { subscribeToSymptoms } from "../../firebase/firestore";
 import { PageSpinner, EmptyState, ConfidenceBar, MedicalDisclaimer } from "../shared/UI";
 import useToast from "../../hooks/useToast";
 
@@ -56,13 +56,16 @@ const parseTags = (item) => {
   let raw = [];
   if (Array.isArray(item.selectedTags) && item.selectedTags.length) {
     raw = item.selectedTags;
-  } else {
-    raw = (item.symptoms || "").split(",").map((s) => s.trim()).filter(Boolean);
+  } else if (Array.isArray(item.symptoms) && item.symptoms.length) {
+    // symptoms stored as array directly in Firestore
+    raw = item.symptoms;
+  } else if (typeof item.symptoms === "string" && item.symptoms) {
+    raw = item.symptoms.split(",").map((s) => s.trim()).filter(Boolean);
   }
   // Deduplicate (case-insensitive)
   const seen = new Set();
   return raw.filter((t) => {
-    const key = t.toLowerCase();
+    const key = String(t).toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -199,29 +202,35 @@ const MedicalHistory = () => {
   const [filterSev, setFilterSev] = useState("All");
   const [retryKey, setRetryKey] = useState(0);
 
-  // ── Fetch — waits for Firebase auth to resolve before querying ──
+  // ── Real-time listener — auth-aware, cleans up on unmount ──
   useEffect(() => {
     setLoading(true);
     setLoadError(null);
 
-    const unsubscribe = onAuthStateChanged(getAuth(), async (currentUser) => {
+    let firestoreUnsub = null;
+
+    const authUnsub = onAuthStateChanged(getAuth(), (currentUser) => {
       console.log("USER:", currentUser);
+
+      // Tear down any previous Firestore listener when auth state changes
+      if (firestoreUnsub) { firestoreUnsub(); firestoreUnsub = null; }
 
       if (!currentUser) {
         console.log("No user logged in");
         setLoading(false);
+        setHistory([]);
         return;
       }
 
-      try {
-        const { symptoms, error } = await getSymptomsDoc(currentUser.uid);
+      // Real-time subscription — no orderBy, no index required
+      firestoreUnsub = subscribeToSymptoms(currentUser.uid, ({ symptoms, error }) => {
         console.log("FETCHED:", symptoms);
 
         if (error) {
           setLoadError(error);
           toastRef.current.error("Could not load medical history.");
         } else {
-          // Sort latest first in JS — no Firestore index required
+          // Sort latest first in JS
           const sorted = (symptoms || []).slice().sort((a, b) => {
             const aTs = a.timestamp ? new Date(a.timestamp).getTime() : (a.createdAt?.seconds ?? 0) * 1000;
             const bTs = b.timestamp ? new Date(b.timestamp).getTime() : (b.createdAt?.seconds ?? 0) * 1000;
@@ -230,24 +239,25 @@ const MedicalHistory = () => {
 
           const normalized = sorted.map((s) => ({
             ...s,
-            diagnosis: toTitleCase(s.diagnosis),
+            diagnosis: toTitleCase(s.diagnosis || s.disease || ""),
             severity: s.severity
               ? s.severity.charAt(0).toUpperCase() + s.severity.slice(1).toLowerCase()
               : undefined,
+            selectedTags: Array.isArray(s.selectedTags)
+              ? s.selectedTags
+              : Array.isArray(s.symptoms) ? s.symptoms : [],
           }));
           setHistory(normalized);
         }
-      } catch (err) {
-        console.error("[MedicalHistory] Fetch error:", err);
-        setLoadError(err.message || "Unknown error");
-        toastRef.current.error("Unexpected error loading history.");
-      } finally {
         setLoading(false); // ALWAYS stops the spinner
-      }
+      });
     });
 
-    // Unsubscribe auth listener on unmount or retryKey change
-    return () => unsubscribe();
+    // Cleanup both listeners on unmount or retryKey change
+    return () => {
+      authUnsub();
+      if (firestoreUnsub) firestoreUnsub();
+    };
   }, [retryKey]);
 
   // ── Filter + derived ───────────────────────────────────────
