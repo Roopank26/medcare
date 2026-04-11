@@ -2,22 +2,22 @@ import React from "react";
 import { useAuth } from "../context/AuthContext";
 
 const TITLES = {
-  overview:     { label: "Dashboard",           icon: "🏠" },
-  symptoms:     { label: "AI Symptom Analyzer", icon: "🧠" },
-  history:      { label: "Medical History",     icon: "📋" },
-  appointments: { label: "Appointments",        icon: "📅" },
-  reports:      { label: "Reports",             icon: "📁" },
-  alerts:       { label: "Health Alerts",       icon: "🔔" },
-  profile:      { label: "My Profile",          icon: "👤" },
-  patients:     { label: "Patient Management",  icon: "👥" },
-  search:       { label: "Search Patients",     icon: "🔍" },
-  analytics:    { label: "Analytics",           icon: "📊" },
+  overview: { label: "Dashboard", icon: "🏠" },
+  symptoms: { label: "AI Symptom Analyzer", icon: "🧠" },
+  history: { label: "Medical History", icon: "📋" },
+  appointments: { label: "Appointments", icon: "📅" },
+  reports: { label: "Reports", icon: "📁" },
+  alerts: { label: "Health Alerts", icon: "🔔" },
+  profile: { label: "My Profile", icon: "👤" },
+  patients: { label: "Patient Management", icon: "👥" },
+  search: { label: "Search Patients", icon: "🔍" },
+  analytics: { label: "Analytics", icon: "📊" },
 };
 
 const Topbar = ({ activeSection }) => {
   const { user } = useAuth();
-  const sect   = TITLES[activeSection] || { label: "Dashboard", icon: "🏠" };
-  const isDoc  = user?.role === "doctor";
+  const sect = TITLES[activeSection] || { label: "Dashboard", icon: "🏠" };
+  const isDoc = user?.role === "doctor";
   const initials = (user?.name || "U")
     .split(" ")
     .map((n) => n[0])
@@ -33,7 +33,7 @@ const Topbar = ({ activeSection }) => {
      * h-16: 64px height (mt-16 in main compensates)
      * z-30: above sidebar (z-20) so it always renders on top
      */
-    <header className="fixed top-0 left-64 right-0 h-16 z-30 bg-white border-b border-gray-100 shadow-sm flex items-center justify-between px-6 md:px-8">
+    <header className="fixed top-0 left-64 right-0 h-16 z-30 glass border-b border-white/60 shadow-sm flex items-center justify-between px-6 md:px-8">
       {/* Left — Section title */}
       <div className="flex items-center gap-3">
         <span className="text-xl hidden sm:block" aria-hidden="true">{sect.icon}</span>
@@ -55,17 +55,16 @@ const Topbar = ({ activeSection }) => {
       {/* Right — status + user */}
       <div className="flex items-center gap-3">
         {/* Online indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 bg-secondary-50 text-secondary-700 px-3 py-1.5 rounded-full text-xs font-semibold select-none">
+        <div className="hidden sm:flex items-center gap-1.5 bg-secondary-50 text-secondary-700 px-3 py-1.5 rounded-full text-xs font-semibold select-none border border-secondary-100">
           <span className="w-1.5 h-1.5 bg-secondary rounded-full animate-pulse" />
-          Online
+          Live
         </div>
 
         {/* User avatar + name */}
         <div className="flex items-center gap-2.5">
           <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${
-              isDoc ? "bg-secondary" : "bg-primary"
-            }`}
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-semibold text-xs flex-shrink-0 ${isDoc ? "bg-secondary" : "bg-primary"
+              }`}
           >
             {initials}
           </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { subscribeToSymptoms, getReportsDoc } from "../../firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
-import { PageSpinner } from "../shared/UI";
+import { PageSpinner, SeverityBadge } from "../shared/UI";
 
 /**
  * Alerts — generated dynamically from real Firestore data.
@@ -128,7 +128,7 @@ function buildAlerts(symptoms, reports) {
 const AlertCard = ({ alert, onDismiss }) => {
   const cfg = ALERT_CFG[alert.type] || ALERT_CFG.info;
   return (
-    <div className={`border rounded-xl p-4 flex items-start gap-4 animate-fade-in ${cfg.border}`}>
+    <div className={`border rounded-2xl p-4 flex items-start gap-4 animate-slide-up hover-lift ${cfg.border}`}>
       <span className="text-2xl flex-shrink-0 mt-0.5">{alert.icon}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -144,7 +144,7 @@ const AlertCard = ({ alert, onDismiss }) => {
       </div>
       <button
         onClick={() => onDismiss(alert.id)}
-        className="flex-shrink-0 text-xl font-bold opacity-30 hover:opacity-60 transition-opacity leading-none mt-0.5"
+        className="flex-shrink-0 text-xl font-bold opacity-30 hover:opacity-70 transition-opacity leading-none mt-0.5 hover:text-red-500"
         aria-label="Dismiss alert"
       >
         ×
@@ -218,12 +218,13 @@ const Alerts = () => {
     <div className="animate-fade-in space-y-6">
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {TYPES.map((t) => (
+        {TYPES.map((t, idx) => (
           <button
             key={t.key}
             onClick={() => setFilterType(filterType === t.key ? "All" : t.key)}
-            className={`card text-left hover:-translate-y-0.5 transition-all cursor-pointer ${filterType === t.key ? "ring-2 ring-primary" : ""
+            className={`card card-hover text-left hover-lift animate-slide-up ${filterType === t.key ? "ring-2 ring-primary shadow-card-hover" : ""
               }`}
+            style={{ animationDelay: `${idx * 60}ms` }}
           >
             <div className={`w-10 h-10 ${t.color} rounded-xl flex items-center justify-center text-xl mb-2`}>
               {t.icon}
@@ -235,6 +236,7 @@ const Alerts = () => {
           </button>
         ))}
       </div>
+
 
       {/* Alert list */}
       <div className="card">
@@ -279,7 +281,7 @@ const Alerts = () => {
             <p className="text-gray-400 text-sm">No active alerts right now.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 stagger-list">
             {visible.map((a) => (
               <AlertCard key={a.id} alert={a} onDismiss={dismiss} />
             ))}

@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { subscribeToMedicalHistory } from "../../firebase/firestore";
-import { PageSpinner, EmptyState, ConfidenceBar, MedicalDisclaimer } from "../shared/UI";
+import { MedicalHistorySkeleton, EmptyState, ConfidenceBar, MedicalDisclaimer, SeverityBadge } from "../shared/UI";
 import useToast from "../../hooks/useToast";
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -87,7 +87,7 @@ const DetailModal = ({ item, onClose }) => {
       aria-label="Assessment details"
     >
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto animate-fade-in"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto animate-scale-in"
         style={{ wordWrap: "break-word", overflowWrap: "break-word" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -112,9 +112,7 @@ const DetailModal = ({ item, onClose }) => {
           </div>
           <div className="flex items-center gap-2 mt-3 flex-wrap">
             <span className="text-xs bg-white/20 px-2.5 py-1 rounded-full">{item.confidence}% confidence</span>
-            {item.severity && (
-              <span className="text-xs bg-white/20 px-2.5 py-1 rounded-full">{item.severity} Risk</span>
-            )}
+            <SeverityBadge severity={item.severity} />
           </div>
         </div>
 
@@ -303,9 +301,8 @@ const MedicalHistory = () => {
           </div>
         </div>
 
-        {/* Loading */}
         {loading ? (
-          <PageSpinner message="Loading medical history…" />
+          <MedicalHistorySkeleton />
 
           /* Error */
         ) : loadError ? (
@@ -332,10 +329,10 @@ const MedicalHistory = () => {
                 : "Try clearing the filter to see all records."
             }
             action={filterSev !== "All" ? (
-              <button onClick={() => setFilterSev("All")} className="btn-outline mx-auto text-sm">
-                Clear filter
-              </button>
-            ) : null}
+              <button onClick={() => setFilterSev("All")} className="btn-outline mx-auto text-sm">Clear filter</button>
+            ) : (
+              <p className="text-xs text-gray-400 mt-1">Run the AI Symptom Checker to generate your first record.</p>
+            )}
           />
 
           /* Table */
@@ -354,14 +351,15 @@ const MedicalHistory = () => {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="stagger-list">
                 {shown.map((item, i) => {
                   const tags = parseTags(item);
                   const symptomsLabel = tags.map(toTitleCase).join(", ") || "—";
                   return (
                     <tr
                       key={item.id || i}
-                      className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                      className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors animate-slide-up hover-lift cursor-pointer"
+                      onClick={() => setSelected(item)}
                     >
                       <td className="py-3.5 pr-4 text-gray-400 font-mono text-xs">{i + 1}</td>
                       <td className="py-3.5 pr-4 text-gray-500 text-xs whitespace-nowrap">
@@ -386,21 +384,12 @@ const MedicalHistory = () => {
                         </span>
                       </td>
                       <td className="py-3.5 pr-4">
-                        {item.severity ? (
-                          <span
-                            className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${SEV_STYLE[item.severity] || SEV_STYLE.Unknown
-                              }`}
-                          >
-                            {item.severity}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
+                        <SeverityBadge severity={item.severity} />
                       </td>
-                      <td className="py-3.5">
+                      <td className="py-3.5" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setSelected(item)}
-                          className="text-xs text-primary font-semibold bg-primary-50 px-3 py-1 rounded-lg hover:bg-primary-100 transition-all"
+                          className="text-xs text-white font-semibold bg-primary px-3 py-1.5 rounded-lg hover:bg-primary-600 transition-all active:scale-95 shadow-sm"
                         >
                           View
                         </button>

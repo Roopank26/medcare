@@ -224,20 +224,54 @@ export const deletePatientDoc = async (id) => {
 //  SYMPTOMS
 // ═════════════════════════════════════════════════════════════
 
-/** Save ML symptom assessment. userId = auth.currentUser.uid. */
+/** Save ML symptom assessment. userId = auth.currentUser.uid.
+ *  Writes to TWO collections in parallel:
+ *   1. "symptoms"       — full ML result, for PatientOverview / Alerts
+ *   2. "medical_history" — normalised record, for MedicalHistory page
+ */
 export const saveSymptomDoc = async (userId, data) => {
   try {
-    const ref = await addDoc(collection(db, "symptoms"), {
-      userId,
-      ...data,
-      createdAt: serverTimestamp(),
-    });
-    return { id: ref.id, error: null };
+    // ── Normalise the medical_history payload ──────────────────
+    // data.selectedTags is the array of symptom strings chosen by the user.
+    // data.diagnosis is already title-cased by SymptomChecker before calling here.
+    const topDisease    = data.diagnosis || "";
+    const topConfidence = Number(data.confidence) || 0;
+    const symptomsArr   = Array.isArray(data.selectedTags) && data.selectedTags.length
+      ? data.selectedTags
+      : typeof data.symptoms === "string"
+        ? data.symptoms.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+
+    // Run both writes in parallel — faster, and both share the same timestamp value
+    const [sympRef] = await Promise.all([
+      // 1. Full ML record in "symptoms" (unchanged schema)
+      addDoc(collection(db, "symptoms"), {
+        userId,
+        ...data,
+        createdAt: serverTimestamp(),
+      }),
+
+      // 2. Lightweight normalised record in "medical_history"
+      //    Fields match what subscribeToMedicalHistory serves to MedicalHistory.jsx
+      addDoc(collection(db, "medical_history"), {
+        userId,
+        disease:    topDisease,       // top prediction — toTitleCase already applied
+        confidence: topConfidence,
+        symptoms:   symptomsArr,      // array of selected tags
+        severity:   data.severity || null,
+        action:     data.action   || null,
+        timestamp:  serverTimestamp(),
+        date:       data.date     || new Date().toISOString().split("T")[0],
+      }),
+    ]);
+
+    return { id: sympRef.id, error: null };
   } catch (err) {
     console.error("[Firestore] saveSymptomDoc:", err.message);
     return { id: null, error: err.message };
   }
 };
+
 
 /** One-shot medical history fetch. No orderBy → no composite index required. Sorted in JS. */
 export const getSymptomsDoc = async (userId) => {
