@@ -33,6 +33,7 @@ firebase-credentials.json
 serviceAccountKey.json
 **/serviceAccountKey.json
 firebase-adminsdk-*.json
+.firebase-sa.json
 FIREBASE_SERVICE_ACCOUNT_JSON
 
 # ====== BUILD & DIST ======

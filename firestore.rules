@@ -15,28 +15,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(uid) {
-      return request.auth.uid == uid;
+    // Enforces request.auth.uid == userId for path-scoped ownership.
+    function isSelf(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userDocExists() {
+      return isAuth() && exists(userDocPath());
     }
 
     function getRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return get(userDocPath()).data.role;
     }
 
     function isDoctor() {
-      return isAuth() && getRole() == "doctor";
+      return userDocExists() && getRole() == "doctor";
+    }
+
+    function isValidUserCreate() {
+      let data = request.resource.data;
+      return data.uid == request.auth.uid
+        && data.keys().hasAll(["uid", "email", "role", "createdAt"])
+        && data.role in ["patient", "doctor"];
     }
 
 
-    // ── users/{uid} ───────────────────────────────────────────
-    match /users/{uid} {
-      allow read:   if isAuth() && isOwner(uid);
-      allow create: if isAuth() && isOwner(uid)
-                    && request.resource.data.keys().hasAll(["uid","email","role","createdAt"])
-                    && request.resource.data.role in ["patient","doctor"];
-      allow update: if isAuth() && isOwner(uid)
-                    && !request.resource.data.diff(resource.data)
-                        .affectedKeys().hasAny(["role","email","uid"]);
+    // ── users/{userId} ────────────────────────────────────────
+    match /users/{userId} {
+      allow read:   if isSelf(userId);
+      allow create: if isSelf(userId) && isValidUserCreate();
+      allow update: if isSelf(userId)
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.email == resource.data.email
+                    && request.resource.data.role == resource.data.role;
       allow delete: if false;
     }
 
