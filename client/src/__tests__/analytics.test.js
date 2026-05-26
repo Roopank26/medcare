@@ -15,8 +15,8 @@ jest.mock('firebase/firestore', () => ({
 jest.mock('../utils/logger', () => ({
   action: jest.fn((event, data) => {
     // This is exactly the pattern that caused the infinite loop
-    if (window.__MEDCARE_ANALYTICS__) {
-      window.__MEDCARE_ANALYTICS__.track(event, data);
+    if (global.__MEDCARE_ANALYTICS__) {
+      global.__MEDCARE_ANALYTICS__.track(event, data);
     }
   }),
   warn:  jest.fn(),

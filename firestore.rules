@@ -58,7 +58,7 @@ service cloud.firestore {
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.keys().hasAll(["userId","symptoms","diagnosis"]);
       allow read:   if isAuth()
-                    && (resource.data.userId == request.auth.uid || isDoctor());
+                    && resource.data.userId == request.auth.uid;
       allow update: if false;
       allow delete: if false;
     }
@@ -138,7 +138,7 @@ service cloud.firestore {
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.keys().hasAll(["userId","disease","confidence","timestamp"]);
       allow read:   if isAuth()
-                    && (resource.data.userId == request.auth.uid || isDoctor());
+                    && resource.data.userId == request.auth.uid;
       allow update: if false;
       allow delete: if false;
     }

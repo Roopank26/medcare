@@ -15,7 +15,7 @@ import {
   logoutUser,
   resetPassword,
 } from '../firebase/auth';
-import { getUserProfile } from '../firebase/firestore';
+import { ensureUserProfile, getUserProfile } from '../firebase/firestore';
 import { setMonitoringUser, clearMonitoringUser } from '../utils/monitoring';
 import analytics, { EVENTS } from '../utils/analytics';
 import logger from '../utils/logger';
@@ -33,7 +33,18 @@ export const AuthProvider = ({ children }) => {
     const unsub = subscribeToAuthChanges(async (fbUser) => {
       try {
         if (fbUser) {
-          const profile = await getUserProfile(fbUser.uid);
+          let profile = await getUserProfile(fbUser.uid);
+          if (!profile) {
+            const recovered = await ensureUserProfile(fbUser, {
+              email: fbUser.email,
+              name: fbUser.displayName || fbUser.email,
+              role: 'patient',
+            });
+            profile = recovered.profile;
+            if (!profile && recovered.error) {
+              throw new Error(recovered.error);
+            }
+          }
           if (profile) {
             const merged = {
               uid:   fbUser.uid,
@@ -49,11 +60,7 @@ export const AuthProvider = ({ children }) => {
             analytics.init(fbUser.uid, profile.role);
             logger.info('[Auth] Session restored', { uid: fbUser.uid, role: profile.role });
           } else {
-            await logoutUser();
-            setFireUser(null);
-            setUser(null);
-            clearMonitoringUser();
-            analytics.reset();
+            throw new Error('Unable to load user profile.');
           }
         } else {
           setFireUser(null);

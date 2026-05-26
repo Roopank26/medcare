@@ -130,6 +130,54 @@ export const getUserProfile = async (uid) => {
 };
 
 /**
+ * Ensure a Firestore user profile exists for the authenticated user.
+ * Creates a missing profile once, using the auth UID as the document ID.
+ */
+export const ensureUserProfile = async (authUser, defaults = {}) => {
+  if (!authUser?.uid) {
+    return { profile: null, created: false, error: "Authentication session is missing." };
+  }
+
+  const docRef = doc(db, "users", authUser.uid);
+
+  try {
+    const snap = await getDoc(docRef);
+
+    if (snap.exists()) {
+      return {
+        profile: { uid: authUser.uid, ...snap.data() },
+        created: false,
+        error: null,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const profile = {
+      uid: authUser.uid,
+      name: defaults.name?.trim() || authUser.displayName || authUser.email || "",
+      email: defaults.email?.trim().toLowerCase() || authUser.email?.trim().toLowerCase() || "",
+      role: defaults.role || "patient",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    await setDoc(docRef, profile);
+    return {
+      profile: {
+        ...profile,
+        createdAt: now,
+        updatedAt: now,
+      },
+      created: true,
+      error: null,
+    };
+  } catch (err) {
+    console.error("[Firestore] ensureUserProfile:", err.message);
+    return { profile: null, created: false, error: err.message };
+  }
+};
+
+/**
  * Update editable profile fields.
  * Prevents role, email, uid, and createdAt from being mutated.
  */
@@ -278,18 +326,11 @@ export const getSymptomsDoc = async (userId) => {
   try {
     console.log("UID:", userId);
     const col = collection(db, "medical_history");
-    // Plain where-only query — no composite index required
-    const snap = await getDocs(query(col, where("userId", "==", userId)));
-    console.log("Docs:", snap.docs.length);
-
-    const raw = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-    // Sort latest first in JS
-    raw.sort((a, b) => {
-      const aTs = a.timestamp?.seconds ?? 0;
-      const bTs = b.timestamp?.seconds ?? 0;
-      return bTs - aTs;
-    });
+    const raw = await safeDocs(
+      query(col, where("userId", "==", userId), orderBy("timestamp", "desc")),
+      query(col, where("userId", "==", userId))
+    );
+    console.log("Docs:", raw.length);
 
     return {
       symptoms: raw.map((d) => ({
@@ -318,37 +359,21 @@ export const subscribeToSymptoms = (userId, callback) => {
   }
 
   const col = collection(db, "medical_history");
-  // Plain where-only query — no index needed
-  const q = query(col, where("userId", "==", userId));
+  const q = query(col, where("userId", "==", userId), orderBy("timestamp", "desc"));
+  const fb = query(col, where("userId", "==", userId));
 
-  const unsub = onSnapshot(
-    q,
-    (snap) => {
-      const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Sort latest first in JS
-      docs.sort((a, b) => {
-        const aTs = a.timestamp?.seconds ?? 0;
-        const bTs = b.timestamp?.seconds ?? 0;
-        return bTs - aTs;
-      });
-      callback({
-        symptoms: docs.map((d) => ({
-          ...d,
-          diagnosis: d.disease,
-          selectedTags: Array.isArray(d.symptoms) ? d.symptoms : [],
-          createdAt: d.timestamp,
-          timestamp: toISO(d.timestamp) || d.date,
-        })),
-        error: null,
-      });
-    },
-    (err) => {
-      console.error("[Firestore] subscribeToSymptoms error:", err.message);
-      callback({ symptoms: [], error: err.message });
-    }
-  );
-
-  return unsub;
+  return safeSnapshot(q, fb, ({ docs, error }) => {
+    callback({
+      symptoms: docs.map((d) => ({
+        ...d,
+        diagnosis: d.disease,
+        selectedTags: Array.isArray(d.symptoms) ? d.symptoms : [],
+        createdAt: d.timestamp,
+        timestamp: toISO(d.timestamp) || d.date,
+      })),
+      error,
+    });
+  });
 };
 
 /**
@@ -368,18 +393,11 @@ export const subscribeToMedicalHistory = (userId, callback) => {
   }
 
   const col = collection(db, "medical_history");
-  const q = query(col, where("userId", "==", userId));
+  const q = query(col, where("userId", "==", userId), orderBy("timestamp", "desc"));
+  const fb = query(col, where("userId", "==", userId));
 
-  return onSnapshot(
-    q,
-    (snapshot) => {
-      const raw = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      raw.sort((a, b) => {
-        const aTs = a.timestamp?.seconds ?? 0;
-        const bTs = b.timestamp?.seconds ?? 0;
-        return bTs - aTs;
-      });
+  return safeSnapshot(q, fb, ({ docs, error }) => {
+      const raw = docs;
 
       console.log("RAW DATA:", raw);
 
@@ -406,14 +424,10 @@ export const subscribeToMedicalHistory = (userId, callback) => {
 
       console.log("MAPPED DATA:", mapped);
       callback(mapped);
-
-
-    },
-    (err) => {
-      console.error("[Firestore] subscribeToMedicalHistory error:", err.message);
-      callback([]); // safe empty array on error
-    }
-  );
+      if (error) {
+        console.error("[Firestore] subscribeToMedicalHistory error:", error);
+      }
+    });
 };
 
 // ═════════════════════════════════════════════════════════════
