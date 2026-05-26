@@ -1,6 +1,9 @@
 {
   "name": "medcare",
   "version": "3.0.0",
+  "engines": {
+    "node": "20.x"
+  },
   "description": "Medcare — AI-Powered Smart Healthcare System",
   "scripts": {
     "install-all": "npm install && cd server && npm install && cd ../client && npm install",

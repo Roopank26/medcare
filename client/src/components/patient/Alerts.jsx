@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { subscribeToSymptoms, getReportsDoc } from "../../firebase/firestore";
 import { useAuth } from "../../context/AuthContext";
-import { PageSpinner, SeverityBadge } from "../shared/UI";
+import { PageSpinner } from "../shared/UI";
 
 /**
  * Alerts — generated dynamically from real Firestore data.

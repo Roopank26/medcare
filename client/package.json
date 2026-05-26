@@ -2,6 +2,9 @@
   "name": "medcare-client",
   "version": "4.0.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "axios": "^1.6.2",
     "dompurify": "^3.1.0",
