@@ -129,5 +129,19 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+
+    // ── medical_history/{historyId} ──────────────────────────
+    // Lightweight normalized symptom records for patient history view.
+    // Each record belongs to ONE authenticated user.
+    match /medical_history/{historyId} {
+      allow create: if isAuth()
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.keys().hasAll(["userId","disease","confidence","timestamp"]);
+      allow read:   if isAuth()
+                    && (resource.data.userId == request.auth.uid || isDoctor());
+      allow update: if false;
+      allow delete: if false;
+    }
+
   }
 }

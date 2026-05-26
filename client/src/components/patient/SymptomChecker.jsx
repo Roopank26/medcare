@@ -163,6 +163,12 @@ const SymptomChecker = ({ onNewDiagnosis }) => {
 
   // ── Analyze ────────────────────────────────────────────────
   const handleAnalyze = async () => {
+    // ── Safety: Ensure user is authenticated ────────────────
+    if (!user || !user.uid) {
+      toast.error("You must be logged in to use the symptom checker.");
+      return;
+    }
+
     const all = [...selectedTags, ...(inputText.trim() ? [inputText.trim()] : [])];
     if (!all.length) { toast.warning("Please add at least one symptom."); return; }
 

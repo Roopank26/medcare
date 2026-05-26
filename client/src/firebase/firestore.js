@@ -310,6 +310,13 @@ export const getSymptomsDoc = async (userId) => {
 
 /** Real-time medical history listener. No orderBy → no composite index required. Sorted in JS. */
 export const subscribeToSymptoms = (userId, callback) => {
+  // ── Safety: Reject null/undefined userId ──────────────────
+  if (!userId) {
+    console.warn("[Firestore] subscribeToSymptoms: userId is required");
+    callback({ symptoms: [], error: "User not authenticated" });
+    return () => {}; // Return dummy unsubscribe function
+  }
+
   const col = collection(db, "medical_history");
   // Plain where-only query — no index needed
   const q = query(col, where("userId", "==", userId));
@@ -348,8 +355,18 @@ export const subscribeToSymptoms = (userId, callback) => {
  * Named alias for MedicalHistory.jsx — calls callback(mappedArray) directly.
  * Normalization (disease→diagnosis, symptoms→selectedTags) done here so
  * components receive clean, type-safe data and need zero extra processing.
+ *
+ * SAFETY: Returns early with empty array if userId is missing or falsy.
+ * This prevents crashes if auth state changes or user logs out mid-operation.
  */
 export const subscribeToMedicalHistory = (userId, callback) => {
+  // ── Safety guard: Reject null/undefined userId ────────────
+  if (!userId) {
+    console.warn("[Firestore] subscribeToMedicalHistory: userId is required");
+    callback([]); // Return empty array, not error object
+    return () => {}; // Return dummy unsubscribe — safe cleanup
+  }
+
   const col = collection(db, "medical_history");
   const q = query(col, where("userId", "==", userId));
 
